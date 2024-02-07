@@ -624,11 +624,11 @@ function __wbg_get_imports() {
         throw new Error(getStringFromWasm0(arg0, arg1));
     };
     imports.wbg.__wbindgen_closure_wrapper895 = function(arg0, arg1, arg2) {
-        const ret = makeClosure(arg0, arg1, 174, __wbg_adapter_20);
+        const ret = makeClosure(arg0, arg1, 175, __wbg_adapter_20);
         return addHeapObject(ret);
     };
     imports.wbg.__wbindgen_closure_wrapper3540 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 288, __wbg_adapter_23);
+        const ret = makeMutClosure(arg0, arg1, 289, __wbg_adapter_23);
         return addHeapObject(ret);
     };
 
@@ -670,7 +670,7 @@ async function __wbg_init(input) {
     if (wasm !== undefined) return wasm;
 
     if (typeof input === 'undefined') {
-        input = new URL('blokus_backend-bcad2c34ccc7586_bg.wasm', import.meta.url);
+        input = new URL('blokus_backend-633c8722b3ca4cf9_bg.wasm', import.meta.url);
     }
     const imports = __wbg_get_imports();
 

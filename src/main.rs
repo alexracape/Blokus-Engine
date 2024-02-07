@@ -22,7 +22,7 @@ fn main() {
     board.place_piece(&players[0], test_piece, 0);
     board.print_board();
 
-    // yew::Renderer::<App>::new().render();
+    yew::Renderer::<App>::new().render();
 
     // // Game loop
     // loop {

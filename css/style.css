@@ -1,15 +1,22 @@
 :root {
-    --board-color: #000000;
-    --red-player: #ff0000;
-    --yellow-player: #ffff00;
-    --blue-player: #0000ff;
-    --green-player: #00ff00;
+    --board-dimension: 20;
+    --square-size: 20px;
+
+    --board-color: #D9D9D9;
+    --red-player: #ff0000d2;
+    --yellow-player: #ffff00d2;
+    --blue-player: #0000ffd2;
+    --green-player: #00f500d2;
 }
 
 .board {
     display: flex;
     flex-direction: column;
     background-color: var(--board-color);
+    padding: 10px;
+    border-radius: 10px;
+    width: calc(var(--board-dimension) * var(--square-size) + 40px);
+    margin: 0 auto;
 }
 
 .board-row {
@@ -20,14 +27,11 @@
 }
 
 .square {
-    width: 20px;
-    height: 20px;
-    border: 1px solid #000000;
+    width: var(--square-size);
+    height: var(--square-size);
     background-color: #ffffff;
+    margin: 1px;
     display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 2em;
     cursor: pointer;
 }
 
