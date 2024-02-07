@@ -3,6 +3,7 @@ use yew::prelude::*;
 use crate::board::Board;
 use crate::player::Player;
 use crate::gui::board::BlokusBoard;
+use crate::gui::pieces::PieceTray;
 
 #[function_component]
 pub fn App() -> Html {
@@ -23,10 +24,18 @@ pub fn App() -> Html {
     //     }
     // };
 
+    // let onclick = {
+    //     board.place_piece(player, piece, offset);
+    // };
+
     html! {
         <div>
             <h1>{ "BLOKUS" }</h1>
             <BlokusBoard board={board.board} />
+            <PieceTray player={players[0].clone()} />
+
+            <h2>{ "Testing Buttons" }</h2>
+            // <button onclick={onclick}>{ "Place Piece" }</button>
         </div>
     }
 }

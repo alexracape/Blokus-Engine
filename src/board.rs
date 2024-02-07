@@ -2,7 +2,7 @@
 Blokus Board
 */
 
-use crate::player::{self, Player};
+use crate::{pieces::PieceVariant, player::Player};
 
 
 pub const BOARD_SIZE: usize = 20;
@@ -18,18 +18,19 @@ impl Board {
         }
     }
 
-    pub fn is_valid_move(&mut self, player: &Player, piece_variant: &Vec<bool>, offset: usize) -> bool {
+    pub fn is_valid_move(&mut self, player: &Player, piece_variant: &PieceVariant, offset: usize) -> bool {
 
         // Check piece is within bounds and does not go over edge of board
-        if offset + piece_variant.len() > self.board.len() {
+        let variant = &piece_variant.variant;
+        if offset + variant.len() > self.board.len() {
             return false;
-        } else if offset % BOARD_SIZE + piece_variant.len() > BOARD_SIZE {
+        } else if offset % BOARD_SIZE + variant.len() > BOARD_SIZE {
             return false;
         }
 
-        let board_slice = &self.board[offset..offset + piece_variant.len()];
+        let board_slice = &self.board[offset..offset + variant.len()];
         let player_restricted: u8 = 1 << player.num + 3;
-        board_slice.iter().zip(piece_variant.iter()).all(|(a, b)| {
+        board_slice.iter().zip(variant.iter()).all(|(a, b)| {
             if *b {
                 if *a & player_restricted != 0 {
                     return false;
@@ -40,8 +41,9 @@ impl Board {
     }
 
     /// Places a piece onto the board, assumes that the move is valid
-    pub fn place_piece(&mut self, player: &Player, shape: &Vec<bool>, offset: usize) {
+    pub fn place_piece(&mut self, player: &Player, piece: &PieceVariant, offset: usize) {
         
+        let shape = &piece.variant;
         let fully_restricted: u8 = 0b1111_0000;
         let player_restricted: u8 = 1 << player.num + 3;
         for i in 0..shape.len() {
@@ -93,7 +95,7 @@ mod tests {
     fn test_is_valid_move() {
         let mut board = Board::new();
         let player = Player::new(1);
-        let piece = vec![true, true];
+        let piece = PieceVariant::new(vec![vec![true, true]]);
         assert_eq!(board.is_valid_move(&player, &piece, 0), true);
         assert!(board.is_valid_move(&player, &piece, 19) == false);
     }
@@ -102,7 +104,7 @@ mod tests {
     fn test_place_piece() {
         let mut board = Board::new();
         let player = Player::new(1);
-        let piece = vec![true, true];
+        let piece = PieceVariant::new(vec![vec![true, true]]);
         board.place_piece(&player, &piece, 0);
         assert_eq!(board.board[0], 0b1111_0001);
         assert_eq!(board.board[1], 0b1111_0001);
@@ -112,7 +114,7 @@ mod tests {
     fn test_overlapping_piece() {
         let mut board = Board::new();
         let player = Player::new(1);
-        let piece = vec![true, true];
+        let piece = PieceVariant::new(vec![vec![true, true]]);
         board.place_piece(&player, &piece, 0);
         assert_eq!(board.board[0], 0b1111_0001);
         assert_eq!(board.board[1], 0b1111_0001);
