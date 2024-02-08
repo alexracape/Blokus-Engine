@@ -1,4 +1,6 @@
 
+use std::collections::HashSet;
+
 use crate::pieces::{Piece, PIECE_TYPES};
 use crate::board::{Board, BOARD_SIZE};
 
@@ -6,7 +8,7 @@ use crate::board::{Board, BOARD_SIZE};
 pub struct Player {
     pub num: u8,
     pub pieces: Vec<Piece>,
-    anchors: Vec<usize>,
+    anchors: HashSet<usize>,
 }
 
 impl Player {
@@ -24,10 +26,26 @@ impl Player {
             pieces.push(Piece::new(piece_type));
         }
 
+        let mut anchors = HashSet::new();
+        anchors.insert(start);
+
         Player {
             num: num,
             pieces: pieces,
-            anchors: vec![start],
+            anchors: anchors,
+        }
+    }
+
+    /// Removes an anchor from the player
+    /// Used when a piece is placed
+    pub fn use_anchor(&mut self, anchor: usize) {
+        self.anchors.remove(&anchor);
+    }
+
+    /// Adds an anchor to the player
+    pub fn update_anchors(&mut self, anchors: HashSet<usize>) {
+        for anchor in anchors {
+            self.anchors.insert(anchor);
         }
     }
 
@@ -40,6 +58,12 @@ impl Player {
             // Check piece placements on anchor
             for (i, variant) in piece.variants.iter().enumerate() {
                 for offset in &variant.offsets {
+                    
+                    // Check for underflow
+                    if offset > anchor {
+                        continue;
+                    }
+
                     let global_offset = anchor - offset; // offset to anchor, then offset to line up piece
                     if board.is_valid_move(self, variant, global_offset) {
                         moves.push((i, global_offset));
@@ -81,6 +105,23 @@ mod tests {
         let player = Player::new(1);
         assert_eq!(player.pieces.len(), 2);
         assert_eq!(player.anchors.len(), 1);
+    }
+
+    #[test]
+    fn test_get_piece_moves() {
+        let mut board = Board::new();
+        let mut player = Player::new(1);
+        let piece = player.pieces[0].clone();
+        let moves = player.get_piece_moves(&piece, &mut board);
+        assert_eq!(moves.len(), 1);
+        assert_eq!(moves[0], (0, 0));
+
+        // Place piece then check for moves
+        board.place_piece(&mut player, &piece.variants[0], 0);
+        let piece = player.pieces[1].clone();
+        let moves = player.get_piece_moves(&piece, &mut board);
+        assert_eq!(moves.len(), 1);
+        assert_eq!(moves[0], (0, 21));
     }
 }
 

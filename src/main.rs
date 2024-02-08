@@ -18,8 +18,8 @@ fn main() {
         players.push(Player::new(i));
     }
 
-    let test_piece = &players[0].pieces[0].variants[0];
-    board.place_piece(&players[0], test_piece, 0);
+    let test_piece = players[0].pieces[0].variants[0].clone();
+    board.place_piece(&mut players[0], &test_piece, 0);
     board.print_board();
 
     yew::Renderer::<App>::new().render();

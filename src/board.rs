@@ -2,6 +2,8 @@
 Blokus Board
 */
 
+use std::collections::HashSet;
+
 use crate::{pieces::PieceVariant, player::Player};
 
 
@@ -41,32 +43,46 @@ impl Board {
     }
 
     /// Places a piece onto the board, assumes that the move is valid
-    pub fn place_piece(&mut self, player: &Player, piece: &PieceVariant, offset: usize) {
+    pub fn place_piece(&mut self, player: &mut Player, piece: &PieceVariant, offset: usize) {
         
+        // Remove anchor from player
+        player.use_anchor(offset);
+
+        // Place piece on board
         let shape = &piece.variant;
         let fully_restricted: u8 = 0b1111_0000;
         let player_restricted: u8 = 1 << player.num + 3;
+        let mut new_anchors = HashSet::new();
         for i in 0..shape.len() {
             if shape[i] {
                 self.board[offset + i] = fully_restricted | player.num;
                 println!("{} {}", offset + i, fully_restricted | player.num);
 
                 // Restrict adjacent squares
-                if i % BOARD_SIZE != 0 {
+                if i % BOARD_SIZE != 0 { // Not on left edge
                     self.board[offset + i - 1] |= player_restricted;
                 } 
-                if i % BOARD_SIZE != BOARD_SIZE - 1 {
+                if i % BOARD_SIZE != BOARD_SIZE - 1 { // Not on right edge
                     self.board[offset + i + 1] |= player_restricted;
                 } 
-                if i >= BOARD_SIZE {
+                if i >= BOARD_SIZE { // Not on top edge
                     self.board[offset + i - BOARD_SIZE] |= player_restricted;
                 } 
-                if i < BOARD_SIZE * (BOARD_SIZE - 1) {
+                if i < BOARD_SIZE * (BOARD_SIZE - 1) { // Not on bottom edge
                     self.board[offset + i + BOARD_SIZE] |= player_restricted;
+                }
+
+                // Add new anchors
+                if i % BOARD_SIZE != 0 && self.board[offset + i - 1] == 0 {
+                    new_anchors.insert(offset + i - 1);
                 }
 
             }
         }
+
+        // Update player anchors
+        player.update_anchors(new_anchors);
+
 
     }
 
@@ -103,9 +119,9 @@ mod tests {
     #[test]
     fn test_place_piece() {
         let mut board = Board::new();
-        let player = Player::new(1);
+        let mut player = Player::new(1);
         let piece = PieceVariant::new(vec![vec![true, true]]);
-        board.place_piece(&player, &piece, 0);
+        board.place_piece(&mut player, &piece, 0);
         assert_eq!(board.board[0], 0b1111_0001);
         assert_eq!(board.board[1], 0b1111_0001);
     }
@@ -113,9 +129,9 @@ mod tests {
     #[test]
     fn test_overlapping_piece() {
         let mut board = Board::new();
-        let player = Player::new(1);
+        let mut player = Player::new(1);
         let piece = PieceVariant::new(vec![vec![true, true]]);
-        board.place_piece(&player, &piece, 0);
+        board.place_piece(&mut player, &piece, 0);
         assert_eq!(board.board[0], 0b1111_0001);
         assert_eq!(board.board[1], 0b1111_0001);
         assert!(board.is_valid_move(&player, &piece, 1) == false);

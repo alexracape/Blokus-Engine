@@ -1,7 +1,4 @@
-
-The goal of this module is to implement the core logic for Blokus.
-Eventually this will be an API that can be used in a web app that
-can also interface with a Python ML model.
+# Blokus Engine
 
 Roadmap:
 - Create a board

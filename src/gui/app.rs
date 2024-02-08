@@ -9,7 +9,7 @@ use crate::gui::pieces::PieceTray;
 pub fn App() -> Html {
 
     // Create board and players
-    let mut board = Board::new();
+    let board = Board::new();
     let mut players = Vec::new();
     for i in 1..5 {
         players.push(Player::new(i));

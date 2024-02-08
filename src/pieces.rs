@@ -158,4 +158,41 @@ mod tests {
         assert_eq!(piece.points, 1);
         assert_eq!(piece.variants, Piece::gen_variants(vec![vec![true]]));
     }
+
+    #[test]
+    fn test_piece_rotation() {
+        let shape = vec![vec![true, true]];
+        let rotated = Piece::rotate(shape.clone());
+        assert_eq!(rotated, vec![vec![true], vec![true]]);
+
+        let shape = vec![vec![true, true], vec![true, false]];
+        let rotated = Piece::rotate(shape.clone());
+        assert_eq!(rotated, vec![vec![true, true], vec![false, true]]);
+    }
+
+    #[test]
+    fn test_piece_flip() {
+        let shape = vec![vec![true, true]];
+        let flipped = Piece::flip(shape.clone());
+        assert_eq!(flipped, vec![vec![true, true]]);
+
+        let shape = vec![vec![true, true], vec![true, false]];
+        let flipped = Piece::flip(shape.clone());
+        assert_eq!(flipped, vec![vec![true, true], vec![false, true]]);
+    }
+
+    #[test]
+    fn test_piece_variants() {
+        let shape = vec![vec![true, true]];
+        let variants = Piece::gen_variants(shape.clone());
+        assert_eq!(variants.len(), 2);
+
+        let shape = vec![vec![true, true], vec![true, false]];
+        let variants = Piece::gen_variants(shape.clone());
+        assert_eq!(variants.len(), 4);
+
+        let shape = vec![vec![true, true, true], vec![true, false, false]];
+        let variants = Piece::gen_variants(shape.clone());
+        assert_eq!(variants.len(), 8);
+    }
 }
