@@ -6,9 +6,50 @@ use crate::board::BOARD_SIZE;
 pub enum PieceType {
     One,
     Two,
+    Right,
+    Three,
+    Four,
+    ShortL,
+    Triangle,
+    Square,
+    ShortStep,
+    Five,
+    LongL,
+    LongStep,
+    SquarePlus,
+    LongRight,
+    Steps,
+    Z,
+    Hump,
+    LongWithSide,
+    Plus,
+    Crazy,
+    T
 }
 
-pub const PIECE_TYPES: [PieceType; 2] = [PieceType::One, PieceType::Two];
+pub const PIECE_TYPES: [PieceType; 21] = [
+    PieceType::One, 
+    PieceType::Two,
+    PieceType::Right,
+    PieceType::Three,    
+    PieceType::Four,
+    PieceType::ShortL,
+    PieceType::Triangle,
+    PieceType::Square,
+    PieceType::ShortStep,
+    PieceType::Five,
+    PieceType::LongL,
+    PieceType::LongStep,
+    PieceType::SquarePlus,
+    PieceType::LongRight,
+    PieceType::Steps,
+    PieceType::Z,
+    PieceType::Hump,
+    PieceType::LongWithSide,
+    PieceType::Plus,
+    PieceType::Crazy,
+    PieceType::T
+];
 
 /// A piece variant is a specific orientation of a piece
 /// It is a list of bools, where true represents a filled square
@@ -74,29 +115,34 @@ impl Piece {
     /// Takes a PieceType and redirects to the correct constructor
     /// Those constructors define the shape and create variant shapes
     pub fn new(piece_type: PieceType) -> Piece {
-        match piece_type {
-            PieceType::One => Piece::new_one(),
-            PieceType::Two => Piece::new_two(),
-        }
-    }
+        let shape = match piece_type {
+            PieceType::One => vec![vec![true]],
+            PieceType::Two => vec![vec![true, true]],
+            PieceType::Right => vec![vec![true, true], vec![false, true]],
+            PieceType::Three => vec![vec![true, true, true]],
+            PieceType::Four => vec![vec![true, true, true, true]],
+            PieceType::ShortL => vec![vec![true, true], vec![true, false], vec![true, false]],
+            PieceType::Triangle => vec![vec![true, true, true], vec![false, true, false]],
+            PieceType::Square => vec![vec![true, true], vec![true, true]],
+            PieceType::ShortStep => vec![vec![true, true, false], vec![false, true, true]],
+            PieceType::Five => vec![vec![true, true, true, true, true]],
+            PieceType::LongL => vec![vec![true, true, true, true], vec![true, false, false, false]],
+            PieceType::LongStep => vec![vec![true, true, true, false], vec![false, false, true, true]],
+            PieceType::SquarePlus => vec![vec![true, true, true], vec![true, true, false], vec![true, true, false]],
+            PieceType::LongRight => vec![vec![true, true, true], vec![true, false, false], vec![true, false, false]],
+            PieceType::Steps => vec![vec![true, true, false], vec![false, true, true], vec![false, false, true]],
+            PieceType::Z => vec![vec![true, true, false], vec![false, true, true], vec![false, true, true]],
+            PieceType::Hump => vec![vec![true, true, true], vec![true, false, true]],
+            PieceType::LongWithSide => vec![vec![true, true, true, true], vec![false, true, false, false]],
+            PieceType::Plus => vec![vec![false, true, false], vec![true, true, true], vec![false, true, false]],
+            PieceType::Crazy => vec![vec![false, true, false], vec![true, true, true], vec![true, false, false]],
+            PieceType::T => vec![vec![true, true, true], vec![false, true, false], vec![false, true, false]]
+        };
 
-    fn new_one() -> Piece {
-        let shape = vec![vec![true]];
-        let variants = Piece::gen_variants(shape.clone());
         Piece {
-            shape: shape,
-            points: 1,
-            variants: variants,
-        }
-    }
-
-    fn new_two() -> Piece {
-        let shape = vec![vec![true, true]];
-        let variants = Piece::gen_variants(shape.clone());
-        Piece {
-            shape: shape,
-            points: 2,
-            variants: variants,
+            shape: shape.clone(),
+            points: shape.iter().flatten().filter(|&x| *x).count() as u32,
+            variants: Piece::gen_variants(shape.clone()),
         }
     }
 
@@ -165,6 +211,18 @@ mod tests {
         let piece = Piece::new(PieceType::One);
         assert_eq!(piece.points, 1);
         assert_eq!(piece.variants, Piece::gen_variants(vec![vec![true]]));
+
+        let piece = Piece::new(PieceType::Two);
+        assert_eq!(piece.points, 2);
+        assert_eq!(piece.variants, Piece::gen_variants(vec![vec![true, true]]));
+
+        let piece = Piece::new(PieceType::Right);
+        assert_eq!(piece.points, 3);
+        assert_eq!(piece.variants.len(), 4);
+
+        let piece = Piece::new(PieceType::Crazy);
+        assert_eq!(piece.points, 5);
+        assert_eq!(piece.variants.len(), 8);
     }
 
     #[test]

@@ -107,7 +107,7 @@ mod tests {
     #[test]
     fn test_player_creation() {
         let player = Player::new(1);
-        assert_eq!(player.pieces.len(), 2);
+        assert_eq!(player.pieces.len(), PIECE_TYPES.len());
         assert_eq!(player.anchors.len(), 1);
     }
 
