@@ -12,12 +12,9 @@ pub struct Props {
 pub fn PieceTray(props: &Props) -> Html {
     html! {
         <div class="piece-tray">
-            <h3>{ format!("Player {}", props.player.num) }</h3>
             <div class="piece-tray-inner">
                 { for props.player.pieces.iter().map(|piece| html! {
-                    <div class="piece">
-                        <Piece piece={piece.shape.clone()} />
-                    </div>
+                    <Piece piece={piece.shape.clone()} />
                 })
                 }
             </div>
@@ -35,10 +32,12 @@ pub struct PieceProps {
 fn Piece(props: &PieceProps) -> Html {
     html! {
         <div class="piece">
-            { for props.piece.iter().map(|row| html! {
-                    { for row.iter().map(|cell| html! {
-                        <div class={if *cell { "square red" } else { "square" }}></div>
+            { for props.piece.iter().enumerate().map(|(row_index, row)| html! {
+                <div class="grid-row" key={row_index}>
+                    { for row.iter().enumerate().map(|(col_index, &cell)| html! {
+                        <div class={classes!("square", if cell { "red" } else { "empty" })} key={col_index}></div>
                     })}
+                </div>
             })}
         </div>
     }

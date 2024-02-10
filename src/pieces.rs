@@ -128,7 +128,7 @@ impl Piece {
             PieceType::Five => vec![vec![true, true, true, true, true]],
             PieceType::LongL => vec![vec![true, true, true, true], vec![true, false, false, false]],
             PieceType::LongStep => vec![vec![true, true, true, false], vec![false, false, true, true]],
-            PieceType::SquarePlus => vec![vec![true, true, true], vec![true, true, false], vec![true, true, false]],
+            PieceType::SquarePlus => vec![vec![true, true, true], vec![true, true, false]],
             PieceType::LongRight => vec![vec![true, true, true], vec![true, false, false], vec![true, false, false]],
             PieceType::Steps => vec![vec![true, true, false], vec![false, true, true], vec![false, false, true]],
             PieceType::Z => vec![vec![true, true, false], vec![false, true, true], vec![false, true, true]],
