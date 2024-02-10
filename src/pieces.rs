@@ -17,6 +17,7 @@ pub const PIECE_TYPES: [PieceType; 2] = [PieceType::One, PieceType::Two];
 pub struct PieceVariant {
     pub offsets: Vec<usize>,
     pub variant: Vec<bool>,
+    pub width: usize,
 }
 
 impl PieceVariant {
@@ -25,10 +26,16 @@ impl PieceVariant {
         let mut variant = Vec::new();
         
         // Build the variant that is fully padded to the right
-        for row in shape {
-            for square in &row {
+        for (i, row )in shape.iter().enumerate() {
+            for square in row {
                 variant.push(*square);
             }
+
+            // Pad rest of the row if not last row
+            if i == shape.len() - 1 {
+                continue;
+            }
+
             for _ in 0..BOARD_SIZE - row.len() {
                 variant.push(false);
             }
@@ -43,6 +50,7 @@ impl PieceVariant {
         PieceVariant {
             offsets: offsets,
             variant: variant,
+            width: shape[0].len(),
         }
     }
 }
@@ -157,6 +165,19 @@ mod tests {
         let piece = Piece::new(PieceType::One);
         assert_eq!(piece.points, 1);
         assert_eq!(piece.variants, Piece::gen_variants(vec![vec![true]]));
+    }
+
+    #[test]
+    fn test_variant_creation() {
+        let variant = PieceVariant::new(vec![vec![true]]);
+        assert_eq!(variant.variant, vec![true]);
+        assert_eq!(variant.offsets, vec![0]);
+        assert_eq!(variant.width, 1);
+
+        let variant = PieceVariant::new(vec![vec![true], vec![true]]);
+        assert_eq!(variant.variant.len(), BOARD_SIZE + 1);
+        assert_eq!(variant.offsets, vec![0, BOARD_SIZE]);
+        assert_eq!(variant.width, 1);
     }
 
     #[test]

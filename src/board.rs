@@ -26,7 +26,7 @@ impl Board {
         let variant = &piece_variant.variant;
         if offset + variant.len() > self.board.len() {
             return false;
-        } else if offset % BOARD_SIZE + variant.len() > BOARD_SIZE {
+        } else if offset % BOARD_SIZE + piece_variant.width > BOARD_SIZE {
             return false;
         }
 
@@ -52,36 +52,68 @@ impl Board {
         let shape = &piece.variant;
         let fully_restricted: u8 = 0b1111_0000;
         let player_restricted: u8 = 1 << player.num + 3;
-        let mut new_anchors = HashSet::new();
+        let mut new_anchor_candidates = HashSet::new();
         for i in 0..shape.len() {
-            if shape[i] {
-                self.board[offset + i] = fully_restricted | player.num;
-                println!("{} {}", offset + i, fully_restricted | player.num);
+            
+            // Skip if square is not filled
+            if !shape[i] {
+                continue;
+            }
 
-                // Restrict adjacent squares
-                if i % BOARD_SIZE != 0 { // Not on left edge
-                    self.board[offset + i - 1] |= player_restricted;
-                } 
-                if i % BOARD_SIZE != BOARD_SIZE - 1 { // Not on right edge
-                    self.board[offset + i + 1] |= player_restricted;
-                } 
-                if i >= BOARD_SIZE { // Not on top edge
-                    self.board[offset + i - BOARD_SIZE] |= player_restricted;
-                } 
-                if i < BOARD_SIZE * (BOARD_SIZE - 1) { // Not on bottom edge
-                    self.board[offset + i + BOARD_SIZE] |= player_restricted;
+            self.board[offset + i] = fully_restricted | player.num;
+            println!("{} {}", offset + i, fully_restricted | player.num);
+
+            // Restrict adjacent squares
+            let on_left_edge = i % BOARD_SIZE == 0;
+            let on_right_edge = i % BOARD_SIZE == BOARD_SIZE - 1;
+            let on_top_edge = i < BOARD_SIZE;
+            let on_bottom_edge = i >= BOARD_SIZE * (BOARD_SIZE - 1);
+            if !on_left_edge {
+                self.board[offset + i - 1] |= player_restricted;
+            } 
+            if !on_right_edge { 
+                self.board[offset + i + 1] |= player_restricted;
+            } 
+            if !on_top_edge {
+                self.board[offset + i - BOARD_SIZE] |= player_restricted;
+            } 
+            if !on_bottom_edge {
+                self.board[offset + i + BOARD_SIZE] |= player_restricted;
+            }
+
+            // Add new anchors - TODO need to refine / think of strategy here
+            let corner_offsets: Vec<i32> = vec![
+                1 + BOARD_SIZE as i32,  // bottom right
+                -1 - BOARD_SIZE as i32, // top left
+                1 - BOARD_SIZE as i32,  // top right
+                -1 + BOARD_SIZE as i32  // bottom left
+            ];
+            for corner_offset in corner_offsets {
+                let corner = offset as i32 + i as i32 + corner_offset;
+
+                // Skip if corner is above or below board
+                if corner < 0 || corner >= (BOARD_SIZE * BOARD_SIZE) as i32 {
+                    continue;
                 }
 
-                // Add new anchors
-                if i % BOARD_SIZE != 0 && self.board[offset + i - 1] == 0 {
-                    new_anchors.insert(offset + i - 1);
+                // Skip if corner wraps around to other side of board
+                if on_left_edge && (corner as usize) % BOARD_SIZE == BOARD_SIZE - 1 {
+                    continue;
                 }
-
+                if on_right_edge && (corner as usize) % BOARD_SIZE == 0 {
+                    continue;
+                }   
+                new_anchor_candidates.insert(corner as usize);
             }
         }
 
         // Update player anchors
-        player.update_anchors(new_anchors);
+        for anchor in new_anchor_candidates.clone() {
+            if self.board[anchor] & player_restricted != 0 {
+                new_anchor_candidates.remove(&anchor);
+            }
+        }
+        player.update_anchors(new_anchor_candidates);
 
 
     }
@@ -124,6 +156,9 @@ mod tests {
         board.place_piece(&mut player, &piece, 0);
         assert_eq!(board.board[0], 0b1111_0001);
         assert_eq!(board.board[1], 0b1111_0001);
+        println!("{:?}", player.get_anchors());
+        assert_eq!(player.get_anchors().len(), 1);
+        assert_eq!(player.get_anchors().contains(&22), true);
     }
 
     #[test]

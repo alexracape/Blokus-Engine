@@ -49,6 +49,10 @@ impl Player {
         }
     }
 
+    pub fn get_anchors(&self) -> HashSet<usize> {
+        self.anchors.clone()
+    }
+
     /// Gets all possible moves for a piece
     /// Returns a list of (variant, offset) tuples
     pub fn get_piece_moves(&self, piece: &Piece, board: &mut Board) -> Vec<(usize, usize)> {
@@ -120,7 +124,7 @@ mod tests {
         board.place_piece(&mut player, &piece.variants[0], 0);
         let piece = player.pieces[1].clone();
         let moves = player.get_piece_moves(&piece, &mut board);
-        assert_eq!(moves.len(), 1);
+        assert_eq!(moves.len(), 2); // two orientations of the two-y
         assert_eq!(moves[0], (0, 21));
     }
 }
