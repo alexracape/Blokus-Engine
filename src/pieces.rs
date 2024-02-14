@@ -147,7 +147,7 @@ impl Piece {
     }
 
      // Rotate a piece 90 degrees
-     fn rotate(shape: Vec<Vec<bool>>) -> Vec<Vec<bool>> {
+     pub fn rotate(shape: Vec<Vec<bool>>) -> Vec<Vec<bool>> {
         let mut new_shape = Vec::new();
         for i in 0..shape[0].len() {
             let mut row = Vec::new();
@@ -161,7 +161,7 @@ impl Piece {
     }
 
     // Flip a piece over
-    fn flip(shape: Vec<Vec<bool>>) -> Vec<Vec<bool>> {
+    pub fn flip(shape: Vec<Vec<bool>>) -> Vec<Vec<bool>> {
         let mut new_shape = Vec::new();
         for row in shape {
             let mut new_row = Vec::new();

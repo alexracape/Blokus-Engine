@@ -510,10 +510,6 @@ function __wbg_get_imports() {
         const ret = result;
         return ret;
     };
-    imports.wbg.__wbg_style_ca229e3326b3c3fb = function(arg0) {
-        const ret = getObject(arg0).style;
-        return addHeapObject(ret);
-    };
     imports.wbg.__wbg_dataTransfer_c3dfe779ef079bcc = function(arg0) {
         const ret = getObject(arg0).dataTransfer;
         return isLikeNone(ret) ? 0 : addHeapObject(ret);
@@ -615,9 +611,6 @@ function __wbg_get_imports() {
         const ret = getObject(arg0).removeChild(getObject(arg1));
         return addHeapObject(ret);
     }, arguments) };
-    imports.wbg.__wbg_setProperty_5144ddce66bbde41 = function() { return handleError(function (arg0, arg1, arg2, arg3, arg4) {
-        getObject(arg0).setProperty(getStringFromWasm0(arg1, arg2), getStringFromWasm0(arg3, arg4));
-    }, arguments) };
     imports.wbg.__wbg_instanceof_ShadowRoot_ef56f954a86c7472 = function(arg0) {
         let result;
         try {
@@ -701,12 +694,12 @@ function __wbg_get_imports() {
     imports.wbg.__wbindgen_throw = function(arg0, arg1) {
         throw new Error(getStringFromWasm0(arg0, arg1));
     };
-    imports.wbg.__wbindgen_closure_wrapper1934 = function(arg0, arg1, arg2) {
-        const ret = makeClosure(arg0, arg1, 312, __wbg_adapter_22);
+    imports.wbg.__wbindgen_closure_wrapper2020 = function(arg0, arg1, arg2) {
+        const ret = makeClosure(arg0, arg1, 323, __wbg_adapter_22);
         return addHeapObject(ret);
     };
-    imports.wbg.__wbindgen_closure_wrapper4685 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 427, __wbg_adapter_25);
+    imports.wbg.__wbindgen_closure_wrapper4771 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 438, __wbg_adapter_25);
         return addHeapObject(ret);
     };
 
@@ -748,7 +741,7 @@ async function __wbg_init(input) {
     if (wasm !== undefined) return wasm;
 
     if (typeof input === 'undefined') {
-        input = new URL('blokus_backend-d14e3d053ca835be_bg.wasm', import.meta.url);
+        input = new URL('blokus_backend-96675afca7d7a3b5_bg.wasm', import.meta.url);
     }
     const imports = __wbg_get_imports();
 

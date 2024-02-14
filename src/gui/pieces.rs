@@ -1,3 +1,4 @@
+
 use wasm_bindgen::JsCast;
 use web_sys::HtmlElement;
 use gloo_console as console;
@@ -8,6 +9,8 @@ use yew::events::DragEvent;
 
 use crate::player::Player;
 use crate::pieces::Piece;
+use yew::Callback;
+use web_sys::KeyboardEvent;
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
@@ -39,17 +42,26 @@ pub struct PieceProps {
 fn GUIPiece(props: &PieceProps) -> Html {
 
     // State
+    let mut shape = props.piece.shape.clone();
     let variant = use_state(|| 0);
     let rotation = use_state(|| 0);
+    let flip = use_state(|| false);
+
+    // TODO: need better logic to keep track of variant
+    // Flip then rotate is different than rotate then flip
+    // Maybe just keep track of variant and reconstruct shape from that?
+    // Shape from variant method?
+
+    // Rotate piece for each rotation in state before rendering
+    for _ in 0..*rotation / 90 {
+        shape = Piece::rotate(shape);
+    }
 
     let ondragstart = {
-        let rotation = rotation.clone();
         move |event: DragEvent| {
             let target = event.target().unwrap();
             let target: HtmlElement = target.dyn_into().unwrap();
             target.class_list().add_1("dragging").unwrap();
-            target.style().set_property("transform", &format!("rotate({}deg)", *rotation)).unwrap();
-
 
             let data = event.data_transfer().unwrap();
             let _ = data.set_data("id", target.id().as_str());
@@ -66,24 +78,40 @@ fn GUIPiece(props: &PieceProps) -> Html {
         }
     };
 
-    let onkeypress = {
+    let rotate = {
         let num_variants = props.piece.variants.len();
         let variant = variant.clone();
-        let rotation = rotation.clone();
-        move |event: KeyboardEvent| {
-            let key = event.key();
+        Callback::from(move |_| {
             variant.set((*variant + 1) % num_variants);
             rotation.set((*rotation + 90) % 360);
-            console::log!("Key pressed", key);
-        }
+        })
+    };
+
+    let flip = {
+        let num_variants = props.piece.variants.len();
+        let variant = variant.clone();
+        Callback::from(move |_| {
+            let num_variants = num_variants;
+            variant.set((*variant + 1) % num_variants);
+        })
+    };
+
+    let onkeypress = {
+        Callback::from(move |event: KeyboardEvent| {
+            match event.key().as_str() {
+                "r" => rotate.emit(event),
+                "f" => flip.emit(event),
+                _ => console::log!("Key pressed", event.key()),
+            }
+        })
     };
 
     html! {
-        <div id={props.idx.clone()} class={classes!("piece")} draggable="true" {ondragstart} {ondragend} {onkeypress} style={format!("transform: rotate({}deg);", *rotation)} tabindex="0">
-            { for props.piece.shape.iter().enumerate().map(|(row_index, row)| html! {
+        <div id={props.idx.clone()} class={classes!("piece")} draggable="true" {ondragstart} {ondragend} {onkeypress} tabindex="0">
+            { for shape.iter().enumerate().map(|(row_index, row)| html! {
                 <div class="grid-row" key={row_index}>
                     { for row.iter().enumerate().map(|(col_index, &cell)| html! {
-                        <div class={classes!("square", if cell { "red" } else { "blue" })} key={col_index}></div>
+                        <div class={classes!("square", if cell { "red" } else { "blank" })} key={col_index}></div>
                     })}
                 </div>
             })}
