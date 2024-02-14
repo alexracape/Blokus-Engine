@@ -48,10 +48,10 @@ pub fn BlokusBoard(props: &Props) -> Html {
                                 let target: HtmlElement = e.target().unwrap().dyn_into().unwrap();
                                 let data = e.data_transfer().expect("Data transfer should exist");
                                 let id = data.get_data("id").expect("Dragged piece should have an id");
+                                let variant = data.get_data("variant").unwrap().parse().unwrap();
 
                                 let piece: usize = id.parse().unwrap();
                                 let offset: usize = target.id().parse().unwrap();
-                                let variant = 0; // TODO: get variant from state of piece
                                 (piece, variant, offset)
                             })
                         };

@@ -59,6 +59,7 @@ pub struct PieceVariant {
     pub offsets: Vec<usize>,
     pub variant: Vec<bool>,
     pub width: usize,
+    shape: Vec<Vec<bool>>,
 }
 
 impl PieceVariant {
@@ -92,7 +93,12 @@ impl PieceVariant {
             offsets: offsets,
             variant: variant,
             width: shape[0].len(),
+            shape: shape,
         }
+    }
+
+    pub fn get_shape(&self) -> Vec<Vec<bool>> {
+        self.shape.clone()
     }
 }
 
@@ -229,6 +235,15 @@ mod tests {
         let piece = Piece::new(PieceType::Crazy);
         assert_eq!(piece.points, 5);
         assert_eq!(piece.variants.len(), 8);
+    }
+
+    #[test]
+    fn test_get_shape() {
+        let variant = PieceVariant::new(vec![vec![true, true]]);
+        assert_eq!(variant.get_shape(), vec![vec![true, true]]);
+
+        let variant = PieceVariant::new(vec![vec![true, true], vec![true, false]]);
+        assert_eq!(variant.get_shape(), vec![vec![true, true], vec![true, false]]);
     }
 
     #[test]

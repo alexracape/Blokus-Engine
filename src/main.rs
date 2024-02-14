@@ -3,6 +3,7 @@ mod gui;
 mod pieces;
 mod player;
 mod board;
+mod state;
 
 use crate::player::Player;
 use crate::board::Board;

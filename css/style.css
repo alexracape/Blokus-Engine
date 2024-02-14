@@ -57,13 +57,11 @@
 
 .piece-tray {
     display: flex;
-    justify-content: center;
     margin-top: 10px;
 }
 
 .piece-tray-inner {
     display: flex;
-    justify-content: center;
     width: 100%;
     overflow-x: auto;
     padding: 30px;
@@ -75,7 +73,7 @@
 
 .piece {
     padding: 10px;
-    margin: 1px;
+    margin: auto;
     display: flex;
 }
 

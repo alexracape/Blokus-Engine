@@ -12,9 +12,10 @@ use crate::pieces::Piece;
 use yew::Callback;
 use web_sys::KeyboardEvent;
 
+
 #[derive(Properties, PartialEq)]
 pub struct Props {
-    pub player: Player,
+    pub pieces: Vec<Piece>,
 }
 
 #[function_component]
@@ -22,7 +23,7 @@ pub fn PieceTray(props: &Props) -> Html {
     html! {
         <div class="piece-tray">
             <div class="piece-tray-inner">
-                { for props.player.pieces.iter().enumerate().map(|(idx, piece)| html! {
+                { for props.pieces.iter().enumerate().map(|(idx, piece)| html! {
                     <GUIPiece piece={piece.clone()} idx={idx.to_string()} />
                 })
                 }
@@ -42,22 +43,10 @@ pub struct PieceProps {
 fn GUIPiece(props: &PieceProps) -> Html {
 
     // State
-    let mut shape = props.piece.shape.clone();
     let variant = use_state(|| 0);
-    let rotation = use_state(|| 0);
-    let flip = use_state(|| false);
-
-    // TODO: need better logic to keep track of variant
-    // Flip then rotate is different than rotate then flip
-    // Maybe just keep track of variant and reconstruct shape from that?
-    // Shape from variant method?
-
-    // Rotate piece for each rotation in state before rendering
-    for _ in 0..*rotation / 90 {
-        shape = Piece::rotate(shape);
-    }
 
     let ondragstart = {
+        let variant = variant.clone();
         move |event: DragEvent| {
             let target = event.target().unwrap();
             let target: HtmlElement = target.dyn_into().unwrap();
@@ -65,6 +54,7 @@ fn GUIPiece(props: &PieceProps) -> Html {
 
             let data = event.data_transfer().unwrap();
             let _ = data.set_data("id", target.id().as_str());
+            let _ = data.set_data("variant", &*variant.to_string().as_str());
             console::log!("Drag start", event);
         } 
     };
@@ -82,8 +72,21 @@ fn GUIPiece(props: &PieceProps) -> Html {
         let num_variants = props.piece.variants.len();
         let variant = variant.clone();
         Callback::from(move |_| {
-            variant.set((*variant + 1) % num_variants);
-            rotation.set((*rotation + 90) % 360);
+            let next = match num_variants {
+                1 => 0,
+                2 => {(*variant + 1) % 2},
+                4 => {(*variant + 1) % 4},
+                8 => {
+                    if *variant > 3 {
+                        (*variant + 1) % 4 + 4
+                    } else {
+                        (*variant + 1) % 4
+                    }
+                },
+                _ => 0,
+            };
+            variant.set(next);
+            console::log!("ROTATE")
         })
     };
 
@@ -91,8 +94,15 @@ fn GUIPiece(props: &PieceProps) -> Html {
         let num_variants = props.piece.variants.len();
         let variant = variant.clone();
         Callback::from(move |_| {
-            let num_variants = num_variants;
-            variant.set((*variant + 1) % num_variants);
+            let next = match num_variants  {
+                1 => 0,
+                2 => *variant,
+                4 => {(*variant + 2) % 4}, // Depends on symmetry of shape but this is okay for now
+                8 => {(*variant + 4) % 8},
+                _ => 0,
+            };
+            variant.set(next); // Edit to go to opposite side of cycle
+            console::log!("FLIP")
         })
     };
 
@@ -108,7 +118,7 @@ fn GUIPiece(props: &PieceProps) -> Html {
 
     html! {
         <div id={props.idx.clone()} class={classes!("piece")} draggable="true" {ondragstart} {ondragend} {onkeypress} tabindex="0">
-            { for shape.iter().enumerate().map(|(row_index, row)| html! {
+            { for props.piece.variants.get(*variant).unwrap().get_shape().iter().enumerate().map(|(row_index, row)| html! {
                 <div class="grid-row" key={row_index}>
                     { for row.iter().enumerate().map(|(col_index, &cell)| html! {
                         <div class={classes!("square", if cell { "red" } else { "blank" })} key={col_index}></div>

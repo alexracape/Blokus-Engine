@@ -119,6 +119,34 @@ impl Board {
 
     }
 
+    pub fn remove_piece(&mut self, player: &Player, piece: &PieceVariant, offset: usize) {
+        let shape = &piece.variant;
+        let player_restricted: u8 = 1 << player.num + 3;
+        // for i in 0..shape.len() {
+        //     if shape[i] {
+        //         self.board[offset + i] = 0;
+        //         let on_left_edge = i % BOARD_SIZE == 0;
+        //         let on_right_edge = i % BOARD_SIZE == BOARD_SIZE - 1;
+        //         let on_top_edge = i < BOARD_SIZE;
+        //         let on_bottom_edge = i >= BOARD_SIZE * (BOARD_SIZE - 1);
+        //         if !on_left_edge {
+        //             self.board[offset + i - 1] &= !player_restricted;
+        //         } 
+        //         if !on_right_edge { 
+        //             self.board[offset + i + 1] &= !player_restricted;
+        //         } 
+        //         if !on_top_edge {
+        //             self.board[offset + i - BOARD_SIZE] &= !player_restricted;
+        //         } 
+        //         if !on_bottom_edge {
+        //             self.board[offset + i + BOARD_SIZE] &= !player_restricted;
+        //         }
+        //     }
+        // }
+
+        // Need to check this stuff, just placeholder for now
+    }
+
     pub fn print_board(&self) {
         for i in 0..BOARD_SIZE {
             for j in 0..BOARD_SIZE {
