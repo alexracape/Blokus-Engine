@@ -131,7 +131,7 @@ impl Piece {
             PieceType::SquarePlus => vec![vec![true, true, true], vec![true, true, false]],
             PieceType::LongRight => vec![vec![true, true, true], vec![true, false, false], vec![true, false, false]],
             PieceType::Steps => vec![vec![true, true, false], vec![false, true, true], vec![false, false, true]],
-            PieceType::Z => vec![vec![true, true, false], vec![false, true, true], vec![false, true, true]],
+            PieceType::Z => vec![vec![true, true, false], vec![false, true, false], vec![false, true, true]],
             PieceType::Hump => vec![vec![true, true, true], vec![true, false, true]],
             PieceType::LongWithSide => vec![vec![true, true, true, true], vec![false, true, false, false]],
             PieceType::Plus => vec![vec![false, true, false], vec![true, true, true], vec![false, true, false]],
@@ -197,6 +197,12 @@ impl Piece {
         }
 
         variants
+    }
+}
+
+impl PartialEq for Piece {
+    fn eq(&self, other: &Self) -> bool {
+        self.shape == other.shape
     }
 }
 

@@ -9,6 +9,7 @@ use crate::{pieces::PieceVariant, player::Player};
 
 pub const BOARD_SIZE: usize = 20;
 
+#[derive(Clone)]
 pub struct Board {
     pub board: [u8; BOARD_SIZE * BOARD_SIZE], // 20x20 board
 }
