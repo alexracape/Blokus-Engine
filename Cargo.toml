@@ -21,4 +21,6 @@ features = [
     "Node",
     "Document",
     "Window",
+    "CssStyleDeclaration",
+    "KeyboardEvent",
 ]

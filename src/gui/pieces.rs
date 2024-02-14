@@ -40,12 +40,16 @@ fn GUIPiece(props: &PieceProps) -> Html {
 
     // State
     let variant = use_state(|| 0);
+    let rotation = use_state(|| 0);
 
     let ondragstart = {
+        let rotation = rotation.clone();
         move |event: DragEvent| {
             let target = event.target().unwrap();
             let target: HtmlElement = target.dyn_into().unwrap();
             target.class_list().add_1("dragging").unwrap();
+            target.style().set_property("transform", &format!("rotate({}deg)", *rotation)).unwrap();
+
 
             let data = event.data_transfer().unwrap();
             let _ = data.set_data("id", target.id().as_str());
@@ -62,12 +66,24 @@ fn GUIPiece(props: &PieceProps) -> Html {
         }
     };
 
+    let onkeypress = {
+        let num_variants = props.piece.variants.len();
+        let variant = variant.clone();
+        let rotation = rotation.clone();
+        move |event: KeyboardEvent| {
+            let key = event.key();
+            variant.set((*variant + 1) % num_variants);
+            rotation.set((*rotation + 90) % 360);
+            console::log!("Key pressed", key);
+        }
+    };
+
     html! {
-        <div id={props.idx.clone()} class={classes!("piece")} draggable="true" {ondragstart} {ondragend}>
+        <div id={props.idx.clone()} class={classes!("piece")} draggable="true" {ondragstart} {ondragend} {onkeypress} style={format!("transform: rotate({}deg);", *rotation)} tabindex="0">
             { for props.piece.shape.iter().enumerate().map(|(row_index, row)| html! {
                 <div class="grid-row" key={row_index}>
                     { for row.iter().enumerate().map(|(col_index, &cell)| html! {
-                        <div class={classes!("square", if cell { "red" } else { "blank" })} key={col_index}></div>
+                        <div class={classes!("square", if cell { "red" } else { "blue" })} key={col_index}></div>
                     })}
                 </div>
             })}
