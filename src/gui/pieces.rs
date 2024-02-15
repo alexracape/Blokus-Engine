@@ -7,7 +7,6 @@ use yew::prelude::*;
 use yew::{function_component, html, Properties};
 use yew::events::DragEvent;
 
-use crate::player::Player;
 use crate::pieces::Piece;
 use yew::Callback;
 use web_sys::KeyboardEvent;
@@ -86,7 +85,7 @@ fn GUIPiece(props: &PieceProps) -> Html {
                 _ => 0,
             };
             variant.set(next);
-            console::log!("ROTATE")
+            console::log!("ROTATE", *variant)
         })
     };
 
@@ -102,7 +101,7 @@ fn GUIPiece(props: &PieceProps) -> Html {
                 _ => 0,
             };
             variant.set(next); // Edit to go to opposite side of cycle
-            console::log!("FLIP")
+            console::log!("FLIP", *variant)
         })
     };
 

@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use web_sys::console;
 use yew::prelude::*;
 
 use crate::board::Board;
@@ -31,9 +32,13 @@ impl Reducible for State {
                 let mut player = new_state.players[self.current_player].clone();
                 let piece = player.pieces[p].variants[v].clone();
                 
-                // Asssume valid for now
-                // if self.board.is_valid_move(...)
-                // Remove piece from player
+                // Check if move is valid
+                if !new_state.board.is_valid_move(&player, &piece, o) {
+                    return self.into();
+                }
+
+                // Remove piece from player and place piece
+                new_state.players[self.current_player].pieces.remove(p);
                 new_state.board.place_piece(&mut player, &piece, o);
                 new_state.current_player = (self.current_player + 1) % self.players.len();
 
