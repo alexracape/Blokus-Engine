@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
-use web_sys::console;
 use yew::prelude::*;
+use gloo_console as console;
 
 use crate::board::Board;
 use crate::player::{self, Player};
@@ -34,6 +34,7 @@ impl Reducible for State {
                 
                 // Check if move is valid
                 if !new_state.board.is_valid_move(&player, &piece, o) {
+                    console::log!("Invalid move");
                     return self.into();
                 }
 

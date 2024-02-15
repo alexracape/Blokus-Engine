@@ -250,6 +250,7 @@ mod tests {
     fn test_variant_creation() {
         let variant = PieceVariant::new(vec![vec![true]]);
         assert_eq!(variant.variant, vec![true]);
+        assert_eq!(variant.variant.len(), 1);
         assert_eq!(variant.offsets, vec![0]);
         assert_eq!(variant.width, 1);
 

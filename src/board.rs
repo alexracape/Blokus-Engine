@@ -33,20 +33,22 @@ impl Board {
 
         let board_slice = &self.board[offset..offset + variant.len()];
         let player_restricted: u8 = 1 << player.num + 3;
-        board_slice.iter().zip(variant.iter()).all(|(a, b)| {
+        let on_blanks = board_slice.iter().zip(variant.iter()).all(|(a, b)| {
             if *b {
                 if *a & player_restricted != 0 {
                     return false;
                 }
             }
             true
-        })
+        });
+        let on_anchor = player.get_anchors().contains(&offset); // only check offset for now
+        on_blanks && on_anchor
     }
 
     /// Places a piece onto the board, assumes that the move is valid
     pub fn place_piece(&mut self, player: &mut Player, piece: &PieceVariant, offset: usize) {
         
-        // Remove anchor from player
+        // Remove anchor from player - error handling?
         player.use_anchor(offset);
 
         // Place piece on board
@@ -60,26 +62,27 @@ impl Board {
             if !shape[i] {
                 continue;
             }
+            let space = offset + i;
 
-            self.board[offset + i] = fully_restricted | player.num;
+            self.board[space] = fully_restricted | player.num;
             println!("{} {}", offset + i, fully_restricted | player.num);
 
             // Restrict adjacent squares
-            let on_left_edge = i % BOARD_SIZE == 0;
-            let on_right_edge = i % BOARD_SIZE == BOARD_SIZE - 1;
-            let on_top_edge = i < BOARD_SIZE;
-            let on_bottom_edge = i >= BOARD_SIZE * (BOARD_SIZE - 1);
+            let on_left_edge = space % BOARD_SIZE == 0;
+            let on_right_edge = space % BOARD_SIZE == BOARD_SIZE - 1;
+            let on_top_edge = space < BOARD_SIZE;
+            let on_bottom_edge = space >= BOARD_SIZE * (BOARD_SIZE - 1);
             if !on_left_edge {
-                self.board[offset + i - 1] |= player_restricted;
+                self.board[space - 1] |= player_restricted;
             } 
             if !on_right_edge { 
-                self.board[offset + i + 1] |= player_restricted;
+                self.board[space + 1] |= player_restricted;
             } 
             if !on_top_edge {
-                self.board[offset + i - BOARD_SIZE] |= player_restricted;
+                self.board[space - BOARD_SIZE] |= player_restricted;
             } 
             if !on_bottom_edge {
-                self.board[offset + i + BOARD_SIZE] |= player_restricted;
+                self.board[space + BOARD_SIZE] |= player_restricted;
             }
 
             // Add new anchors - TODO need to refine / think of strategy here

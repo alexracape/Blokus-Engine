@@ -16,8 +16,8 @@ impl Player {
         let start = match num {
             1 => 0,
             2 => BOARD_SIZE - 1,
-            3 => BOARD_SIZE * (BOARD_SIZE - 1),
-            4 => BOARD_SIZE * BOARD_SIZE - 1,
+            3 => BOARD_SIZE * BOARD_SIZE - 1,
+            4 => BOARD_SIZE * (BOARD_SIZE - 1),
             _ => panic!("Invalid player number"),
         };
 
