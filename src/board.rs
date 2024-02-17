@@ -49,9 +49,6 @@ impl Board {
 
     /// Places a piece onto the board, assumes that the move is valid
     pub fn place_piece(&mut self, player: &mut Player, piece: &PieceVariant, offset: usize) {
-        
-        // Remove anchor from player - error handling?
-        player.use_anchor(offset);
 
         // Place piece on board
         let shape = &piece.variant;
@@ -65,6 +62,9 @@ impl Board {
                 continue;
             }
             let space = offset + i;
+
+            // Check to remove anchor from player - TODO need to remove from all players
+            player.use_anchor(space);
 
             self.board[space] = fully_restricted | player.num;
             println!("{} {}", offset + i, fully_restricted | player.num);

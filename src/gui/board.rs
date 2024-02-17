@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use wasm_bindgen::JsCast;
 use web_sys::HtmlElement;
 
@@ -11,11 +13,12 @@ use crate::board::BOARD_SIZE;
 pub struct Props {
     pub board: [u8; BOARD_SIZE * BOARD_SIZE],
     pub on_board_drop: Callback<(usize, usize, usize)>,
+    pub anchors: HashSet<usize>,
 }
 
 #[function_component]
 pub fn BlokusBoard(props: &Props) -> Html {
-    let Props { board, on_board_drop } = props.clone();
+    let Props { board, on_board_drop, anchors } = props.clone();
 
     let ondragover = {
         move |event: DragEvent| {
@@ -32,13 +35,17 @@ pub fn BlokusBoard(props: &Props) -> Html {
                 {
                     for (0..BOARD_SIZE).map(|j| {
                         let index = i * BOARD_SIZE + j;
-                        let square_style = match board[index] & 0b1111 {
-                            1 => "square red",
-                            2 => "square blue",
-                            3 => "square green",
-                            4 => "square yellow",
-                            _ => "square empty"
+                        let mut square_style = match board[index] & 0b1111 {
+                            1 => "square red".to_string(),
+                            2 => "square blue".to_string(),
+                            3 => "square green".to_string(),
+                            4 => "square yellow".to_string(),
+                            _ => "square empty".to_string(),
                         };
+
+                        if anchors.contains(&index) {
+                            square_style = format!("{} anchor", square_style);
+                        }
 
                         let ondrop = {
                             on_board_drop.reform(move |e: DragEvent| {

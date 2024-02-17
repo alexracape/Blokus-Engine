@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use yew::prelude::*;
@@ -88,5 +89,9 @@ impl State {
 
     pub fn get_current_player(&self) -> usize {
         self.current_player
+    }
+
+    pub fn get_current_anchors(&self) -> HashSet<usize> {
+        self.players[self.current_player].get_anchors()
     }
 }

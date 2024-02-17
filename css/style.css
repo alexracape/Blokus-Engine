@@ -55,6 +55,10 @@
     background-color: #ffffff00;
 }
 
+.anchor {
+    background-color: #00000000;
+}
+
 .piece-tray {
     display: flex;
     margin-top: 10px;

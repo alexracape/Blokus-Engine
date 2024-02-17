@@ -35,7 +35,7 @@ pub fn App() -> Html {
         <div>
             <h1>{ "Blokus Engine" }</h1>
             
-            <BlokusBoard board={state.get_board()} on_board_drop={on_board_drop} />
+            <BlokusBoard board={state.get_board()} on_board_drop={on_board_drop} anchors={state.get_current_anchors()} />
             <PieceTray pieces={state.get_current_player_pieces()} player_num={state.get_current_player()} />
 
             <button onclick={on_reset}>{ "Reset Game" }</button>
