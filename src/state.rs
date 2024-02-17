@@ -29,7 +29,8 @@ impl Reducible for State {
         match action {
             Action::PlacePiece(p, v, o) => {
                 let mut new_state = (*self).clone();
-                let mut player = new_state.players[self.current_player].clone();
+                let player = &mut new_state.players[self.current_player];
+                console::log!("Anchors", player.get_anchors().iter().map(|a| a.to_string()).collect::<Vec<String>>().join(", "));
                 let piece = player.pieces[p].variants[v].clone();
                 
                 // Check if move is valid
@@ -39,8 +40,8 @@ impl Reducible for State {
                 }
 
                 // Remove piece from player and place piece
-                new_state.players[self.current_player].pieces.remove(p);
-                new_state.board.place_piece(&mut player, &piece, o);
+                player.pieces.remove(p);
+                new_state.board.place_piece(player, &piece, o);
                 new_state.current_player = (self.current_player + 1) % self.players.len();
 
                 // Add move to stack

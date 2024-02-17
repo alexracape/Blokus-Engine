@@ -25,6 +25,7 @@ impl Board {
 
         // Check piece is within bounds and does not go over edge of board
         let variant = &piece_variant.variant;
+        let piece_squares = &piece_variant.offsets;
         if offset + variant.len() > self.board.len() {
             return false;
         } else if offset % BOARD_SIZE + piece_variant.width > BOARD_SIZE {
@@ -41,7 +42,8 @@ impl Board {
             }
             true
         });
-        let on_anchor = player.get_anchors().contains(&offset); // only check offset for now
+
+        let on_anchor = piece_squares.iter().any(|i| player.get_anchors().contains(&(offset + i)));
         on_blanks && on_anchor
     }
 
@@ -118,7 +120,6 @@ impl Board {
             }
         }
         player.update_anchors(new_anchor_candidates);
-
 
     }
 
