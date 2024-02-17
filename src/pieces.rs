@@ -111,6 +111,7 @@ impl PartialEq for PieceVariant {
 
 #[derive(Clone)]
 pub struct Piece {
+    pub id: usize,
     pub shape: Vec<Vec<bool>>,
     pub points: u32,
     pub variants: Vec<PieceVariant>,
@@ -144,8 +145,10 @@ impl Piece {
             PieceType::Crazy => vec![vec![false, true, false], vec![true, true, true], vec![true, false, false]],
             PieceType::T => vec![vec![true, true, true], vec![false, true, false], vec![false, true, false]]
         };
+        let id = piece_type as usize;
 
         Piece {
+            id: id,
             shape: shape.clone(),
             points: shape.iter().flatten().filter(|&x| *x).count() as u32,
             variants: Piece::gen_variants(shape.clone()),

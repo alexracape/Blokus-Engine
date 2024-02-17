@@ -16,6 +16,7 @@ features = [
     "HtmlElement",
     "Element",
     "DomTokenList",
+    "DomStringMap",
     "DataTransfer",
     "DragEvent",
     "Node",

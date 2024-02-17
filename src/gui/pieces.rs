@@ -15,15 +15,24 @@ use web_sys::KeyboardEvent;
 #[derive(Properties, PartialEq)]
 pub struct Props {
     pub pieces: Vec<Piece>,
+    pub player_num: usize,
 }
 
 #[function_component]
 pub fn PieceTray(props: &Props) -> Html {
+    
+    let color = match props.player_num {
+        0 => "red",
+        1 => "blue",
+        2 => "green",
+        3 => "yellow",
+        _ => "empty"
+    };
     html! {
         <div class="piece-tray">
             <div class="piece-tray-inner">
                 { for props.pieces.iter().enumerate().map(|(idx, piece)| html! {
-                    <GUIPiece piece={piece.clone()} idx={idx.to_string()} />
+                    <GUIPiece key={piece.id} piece={piece.clone()} piece_num={idx.to_string()} color={color} />
                 })
                 }
             </div>
@@ -35,7 +44,8 @@ pub fn PieceTray(props: &Props) -> Html {
 #[derive(Properties, PartialEq)]
 pub struct PieceProps {
     pub piece: Piece,
-    pub idx: String,
+    pub piece_num: String,
+    pub color: &'static str,
 }
 
 #[function_component]
@@ -43,19 +53,37 @@ fn GUIPiece(props: &PieceProps) -> Html {
 
     // State
     let variant = use_state(|| 0);
+    let clicked_square = use_state(|| 0);
 
     let ondragstart = {
         let variant = variant.clone();
+        let clicked_square = clicked_square.clone();
+        let piece = props.piece.clone();
         move |event: DragEvent| {
             let target = event.target().unwrap();
             let target: HtmlElement = target.dyn_into().unwrap();
             target.class_list().add_1("dragging").unwrap();
+            let piece_variant = piece.variants.get(*variant).unwrap();
+            let offset = piece_variant.offsets.get(*clicked_square).unwrap().to_string();
 
             let data = event.data_transfer().unwrap();
-            let _ = data.set_data("id", target.id().as_str());
+            let _ = data.set_data("piece_num", target.get_attribute("data-piece-num").unwrap().as_str());
             let _ = data.set_data("variant", &*variant.to_string().as_str());
+            let _ = data.set_data("piece_offset", offset.as_str());
             console::log!("Drag start", event);
-        } 
+            console::log!("Piece offset", offset);
+       } 
+    };
+
+    let squareclicked = {
+        let clicked_square = clicked_square.clone();
+        move |event: MouseEvent| {
+            let target = event.target().unwrap();
+            let target: HtmlElement = target.dyn_into().unwrap();
+            let square = target.get_attribute("data-square").unwrap();
+            clicked_square.set(square.clone().parse().unwrap());
+            console::log!("Square clicked", square);
+        }
     };
 
     let ondragend = {
@@ -100,7 +128,7 @@ fn GUIPiece(props: &PieceProps) -> Html {
                 8 => {(*variant + 4) % 8},
                 _ => 0,
             };
-            variant.set(next); // Edit to go to opposite side of cycle
+            variant.set(next);
             console::log!("FLIP", *variant)
         })
     };
@@ -115,13 +143,25 @@ fn GUIPiece(props: &PieceProps) -> Html {
         })
     };
 
+    let mut square_num = -1;
+    let v: &crate::pieces::PieceVariant = props.piece.variants.get(*variant).expect(format!("Variant {:?} not found", props.piece.variants).as_str());
     html! {
-        <div id={props.idx.clone()} class={classes!("piece")} draggable="true" {ondragstart} {ondragend} {onkeypress} tabindex="0">
-            { for props.piece.variants.get(*variant).unwrap().get_shape().iter().enumerate().map(|(row_index, row)| html! {
+        <div data-piece-num={props.piece_num.clone()} class={classes!("piece")} draggable="true" {ondragstart} {ondragend} {onkeypress} tabindex="0">
+            {for v.get_shape().iter().enumerate().map(|(row_index, row)| html! {
                 <div class="grid-row" key={row_index}>
-                    { for row.iter().enumerate().map(|(col_index, &cell)| html! {
-                        <div class={classes!("square", if cell { "red" } else { "blank" })} key={col_index}></div>
-                    })}
+                    { for row.iter().enumerate().map(|(col_index, &cell)| 
+                        if cell {
+                            square_num += 1;
+                            let onmousedown = squareclicked.clone();
+                            html! {
+                                <div class={classes!("square", props.color)} key={col_index} {onmousedown} data-square={square_num.to_string()}></div>
+                            }
+                        } else {
+                            html! {
+                                <div class={classes!("square", "blank")} key={col_index}></div>
+                            }
+                        }
+                    )}
                 </div>
             })}
         </div>

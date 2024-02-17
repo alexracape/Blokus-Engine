@@ -1,6 +1,5 @@
 use wasm_bindgen::JsCast;
-use web_sys::{HtmlElement, Window};
-use gloo_console as console;
+use web_sys::HtmlElement;
 
 use yew::prelude::*;
 use yew::{function_component, html, Properties};
@@ -47,11 +46,13 @@ pub fn BlokusBoard(props: &Props) -> Html {
 
                                 let target: HtmlElement = e.target().unwrap().dyn_into().unwrap();
                                 let data = e.data_transfer().expect("Data transfer should exist");
-                                let id = data.get_data("id").expect("Dragged piece should have an id");
+                                let id = data.get_data("piece_num").expect("Dragged piece should have an id");
                                 let variant = data.get_data("variant").unwrap().parse().unwrap();
+                                let clicked_square: usize = data.get_data("piece_offset").unwrap().parse().unwrap();
 
                                 let piece: usize = id.parse().unwrap();
                                 let offset: usize = target.id().parse().unwrap();
+                                let offset = offset - clicked_square;
                                 (piece, variant, offset)
                             })
                         };

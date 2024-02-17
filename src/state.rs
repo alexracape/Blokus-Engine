@@ -4,7 +4,7 @@ use yew::prelude::*;
 use gloo_console as console;
 
 use crate::board::Board;
-use crate::player::{self, Player};
+use crate::player::Player;
 use crate::pieces::Piece;
 
 
@@ -84,5 +84,9 @@ impl State {
 
     pub fn get_current_player_pieces(&self) -> Vec<Piece> {
         self.players[self.current_player].pieces.clone()
+    }
+
+    pub fn get_current_player(&self) -> usize {
+        self.current_player
     }
 }
