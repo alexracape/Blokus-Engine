@@ -38,8 +38,8 @@ impl Player {
 
     /// Removes an anchor from the player
     /// Used when a piece is placed
-    pub fn use_anchor(&mut self, anchor: usize) {
-        self.anchors.remove(&anchor);
+    pub fn use_anchors(&mut self, spaces: &HashSet<usize>) {
+        self.anchors = &self.anchors - spaces;
     }
 
     /// Adds an anchor to the player

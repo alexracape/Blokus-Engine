@@ -48,13 +48,14 @@ impl Board {
     }
 
     /// Places a piece onto the board, assumes that the move is valid
-    pub fn place_piece(&mut self, player: &mut Player, piece: &PieceVariant, offset: usize) {
+    pub fn place_piece(&mut self, player: &mut Player, piece: &PieceVariant, offset: usize) -> HashSet<usize>{
 
         // Place piece on board
         let shape = &piece.variant;
         let fully_restricted: u8 = 0b1111_0000;
         let player_restricted: u8 = 1 << player.num + 3;
         let mut new_anchor_candidates = HashSet::new();
+        let mut used_spaces = HashSet::new();
         for i in 0..shape.len() {
             
             // Skip if square is not filled
@@ -62,9 +63,7 @@ impl Board {
                 continue;
             }
             let space = offset + i;
-
-            // Check to remove anchor from player - TODO need to remove from all players
-            player.use_anchor(space);
+            used_spaces.insert(space);
 
             self.board[space] = fully_restricted | player.num;
             println!("{} {}", offset + i, fully_restricted | player.num);
@@ -120,6 +119,7 @@ impl Board {
             }
         }
         player.update_anchors(new_anchor_candidates);
+        used_spaces
 
     }
 

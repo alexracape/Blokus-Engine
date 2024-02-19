@@ -42,8 +42,13 @@ impl Reducible for State {
 
                 // Remove piece from player and place piece
                 player.pieces.remove(p);
-                new_state.board.place_piece(player, &piece, o);
+                let used_spaces = new_state.board.place_piece(player, &piece, o);
                 new_state.current_player = (self.current_player + 1) % self.players.len();
+
+                // Update anchors for all players
+                for player in &mut new_state.players {
+                    player.use_anchors(&used_spaces);
+                }
 
                 // Add move to stack
                 new_state.move_stack.push((p, v, o));
