@@ -1,17 +1,15 @@
-
+mod board;
+mod game_tree;
 mod gui;
 mod pieces;
 mod player;
-mod board;
 mod state;
 
-use crate::player::Player;
 use crate::board::Board;
 use crate::gui::app::App;
-
+use crate::player::Player;
 
 fn main() {
-
     // Create board and players
     let mut board = Board::new();
     let mut players = Vec::new();
@@ -43,6 +41,3 @@ fn main() {
     //     }
     // }
 }
-
-
-
