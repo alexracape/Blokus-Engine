@@ -1,13 +1,12 @@
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use yew::prelude::*;
 use gloo_console as console;
+use yew::prelude::*;
 
 use crate::board::Board;
-use crate::player::Player;
 use crate::pieces::Piece;
-
+use crate::player::Player;
 
 pub enum Action {
     PlacePiece(usize, usize, usize),
@@ -31,9 +30,17 @@ impl Reducible for State {
             Action::PlacePiece(p, v, o) => {
                 let mut new_state = (*self).clone();
                 let player = &mut new_state.players[self.current_player];
-                console::log!("Anchors", player.get_anchors().iter().map(|a| a.to_string()).collect::<Vec<String>>().join(", "));
+                console::log!(
+                    "Anchors",
+                    player
+                        .get_anchors()
+                        .iter()
+                        .map(|a| a.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                );
                 let piece = player.pieces[p].variants[v].clone();
-                
+
                 // Check if move is valid
                 if !new_state.board.is_valid_move(&player, &piece, o) {
                     console::log!("Invalid move");
@@ -55,17 +62,18 @@ impl Reducible for State {
 
                 // Return new state
                 new_state.into()
-            },
+            }
             Action::Undo => {
                 let mut new_state = (*self).clone();
                 let (p, v, o) = new_state.move_stack.pop().unwrap();
                 let player = &new_state.players[self.current_player];
                 let piece = player.pieces[p].variants[v].clone();
                 new_state.board.remove_piece(player, &piece, o);
-                new_state.current_player = (self.current_player + self.players.len() - 1) % self.players.len();
+                new_state.current_player =
+                    (self.current_player + self.players.len() - 1) % self.players.len();
                 new_state.into()
-            },
-            Action::ResetGame => State::reset().into()
+            }
+            Action::ResetGame => State::reset().into(),
         }
     }
 }
@@ -98,5 +106,20 @@ impl State {
 
     pub fn get_current_anchors(&self) -> HashSet<usize> {
         self.players[self.current_player].get_anchors()
+    }
+
+    pub fn is_terminal(&self) -> bool {
+        true
+    }
+
+    pub fn get_representation(&self) -> (Vec<Vec<bool>>, Vec<Vec<bool>>) {
+        // Get rep of the board where players pieces are divided to seperate boards
+        let board = &self.board.board;
+        let board_rep = Vec::new();
+        for
+
+        // Get rep of pieces remaining for each player
+
+        (board_rep, pieces_rep)
     }
 }
