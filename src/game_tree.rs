@@ -1,4 +1,4 @@
-// Game Tree for MCTS
+// Game Tree to be used by each MCTS simulation
 
 struct Node {
     state: State,
