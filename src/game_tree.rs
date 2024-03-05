@@ -23,8 +23,8 @@ impl Node {
         }
     }
 
-    fn select_child(&Self) -> Node {
-        children.get(0)
+    fn select_child(&self) -> Option<&Node> {
+        self.children.get(0)
     }
 }
 

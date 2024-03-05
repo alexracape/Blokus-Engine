@@ -1,0 +1,11 @@
+
+message State {
+    repeated bool board = 1;
+    repeated bool hand = 2;
+    int32 player = 3;
+}
+
+service BlokusModel {
+    rpc Predict(State) returns (Prediction) {}
+
+}

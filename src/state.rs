@@ -8,6 +8,8 @@ use crate::board::Board;
 use crate::pieces::Piece;
 use crate::player::Player;
 
+const BOARD_SPACES: usize = 400;
+
 pub enum Action {
     PlacePiece(usize, usize, usize),
     Undo,
@@ -20,6 +22,7 @@ pub struct State {
     players: Vec<Player>,
     move_stack: Vec<(usize, usize, usize)>,
     current_player: usize,
+    players_remaining: Vec<usize>
 }
 
 impl Reducible for State {
@@ -89,10 +92,11 @@ impl State {
             players,
             move_stack: Vec::new(),
             current_player: 0,
+            players_remaining: (0..5).collect() 
         }
     }
 
-    pub fn get_board(&self) -> &[u8; 400] {
+    pub fn get_board(&self) -> &[u8; BOARD_SPACES] {
         &self.board.board
     }
 
@@ -109,16 +113,27 @@ impl State {
     }
 
     pub fn is_terminal(&self) -> bool {
-        true
+        self.players_remaining.len() == 0
     }
 
-    pub fn get_representation(&self) -> (Vec<Vec<bool>>, Vec<Vec<bool>>) {
+    pub fn get_representation(&self) -> ([[bool; BOARD_SPACES]; 4], [[bool; 21]; 4]) {
         // Get rep of the board where players pieces are divided to seperate boards
         let board = &self.board.board;
-        let board_rep = Vec::new();
-        for
+        let mut board_rep = [[false; BOARD_SPACES]; 4];
+        for i in 0..BOARD_SPACES {
+            let player = board[i] & 0b1111; // check if there is a player piece
+            if player != 0 {
+                board_rep[player as usize - 1][i] = true;
+            }
+        }
 
         // Get rep of pieces remaining for each player
+        let mut pieces_rep = [[false; 21]; 4];
+        for i in 0..4 {
+            for piece in &self.players[i].pieces {
+                pieces_rep[i][piece.id] = true;
+            }
+        }
 
         (board_rep, pieces_rep)
     }
