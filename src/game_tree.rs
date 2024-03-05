@@ -2,7 +2,7 @@
 
 use crate::state::State;
 
-struct Node {
+pub struct Node {
     state: State,
     children: Vec<Node>,
     parent: Option<Box<Node>>,
@@ -28,7 +28,7 @@ impl Node {
     }
 }
 
-struct GameTree {
+pub struct GameTree {
     root: Node,
 }
 
