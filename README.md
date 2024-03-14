@@ -11,6 +11,8 @@ To run server:
 To run simulation client:
 `cargo run --bin client`
 
+Generate server code: `python -m grpc_tools.protoc -Iproto --python_out=./src/model --pyi_out=./src/model --grpc_python_out=./src/model ./proto/model.proto`
+
 
 On Tap:
 - Undo
