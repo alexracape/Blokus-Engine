@@ -11,7 +11,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = BlokusModelClient::connect("http://[::1]:50051").await?;
 
     let request = tonic::Request::new(ModelInput {
-        data: vec![false; 400 * 28],
+        board: vec![false; 400 * 4],
+        pieces: vec![false; 21 * 4],
+        player: 1,
     });
 
     let response = client.predict(request).await?;

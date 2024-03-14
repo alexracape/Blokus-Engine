@@ -3,7 +3,9 @@ syntax = "proto3";
 package blokusmodel;
 
 message State {
-    repeated bool data = 1;
+    repeated bool board = 1;
+    repeated bool pieces = 2;
+    int32 player = 3;
 }
 
 message Prediction {

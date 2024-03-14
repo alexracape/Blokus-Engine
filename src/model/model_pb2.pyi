@@ -6,10 +6,14 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class State(_message.Message):
-    __slots__ = ("data",)
-    DATA_FIELD_NUMBER: _ClassVar[int]
-    data: _containers.RepeatedScalarFieldContainer[bool]
-    def __init__(self, data: _Optional[_Iterable[bool]] = ...) -> None: ...
+    __slots__ = ("board", "pieces", "player")
+    BOARD_FIELD_NUMBER: _ClassVar[int]
+    PIECES_FIELD_NUMBER: _ClassVar[int]
+    PLAYER_FIELD_NUMBER: _ClassVar[int]
+    board: _containers.RepeatedScalarFieldContainer[bool]
+    pieces: _containers.RepeatedScalarFieldContainer[bool]
+    player: int
+    def __init__(self, board: _Optional[_Iterable[bool]] = ..., pieces: _Optional[_Iterable[bool]] = ..., player: _Optional[int] = ...) -> None: ...
 
 class Prediction(_message.Message):
     __slots__ = ("policy", "value")

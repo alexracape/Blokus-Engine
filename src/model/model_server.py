@@ -9,6 +9,41 @@ import torch
 from torch.nn import Linear, ReLU, Conv2d
 
 
+class BlokusModel(torch.nn.Module):
+
+    def __init__(self):
+        super(BlokusModel, self).__init__()
+
+        self.conv1 = Conv2d(4, 32, kernel_size=3, stride=1, padding=1)
+        self.conv2 = Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+        self.conv3 = Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
+
+        self.fc1 = Linear(128*5*5, 1024)
+        self.fc2 = Linear(1024, 512)
+        self.fc3 = Linear(512, 256)
+
+        self.pi = Linear(256, 21)
+        self.v = Linear(256, 1)
+
+        self.relu = ReLU()
+
+    def forward(self, board, pieces, player):
+        x = self.relu(self.conv1(x))
+        x = self.relu(self.conv2(x))
+        x = self.relu(self.conv3(x))
+
+        x = x.view(-1, 128*5*5)
+
+        x = self.relu(self.fc1(x))
+        x = self.relu(self.fc2(x))
+        x = self.relu(self.fc3(x))
+
+        pi = self.pi(x)
+        v = self.v(x)
+
+        return pi, v
+
+
 class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
     """Servicer for the Blokus model using gRPC
     
@@ -26,11 +61,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         if model_path:
             self.model = torch.load(model_path, map_location=self.device)
         else:
-            self.model = torch.nn.Sequential(
-                torch.nn.Linear(1, 10),
-                torch.nn.ReLU(),
-                torch.nn.Linear(10, 1)
-            ).to(self.device)
+            self.model = BlokusModel().to(self.device)
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.01)
         self.loss = torch.nn.MSELoss().to(self.device)  # Might need to change to custom
@@ -38,20 +69,20 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
     def Predict(self, request, context):
         
         print("Predicting...")
-        state = np.array(request.data).reshape(20, 20, 28)
-        state = torch.tensor(state, dtype=torch.bool).to(self.device)
+        # state = np.array(request.data).reshape(20, 20, 28)
+        # state = torch.tensor(state, dtype=torch.bool).to(self.device)
+        board = np.array(request.board).reshape(4, 20, 20)
+        pieces = np.array(request.pieces).reshape(4, 21)
+        player = request.player
+
         with torch.no_grad():
-            policy, values = self.model(state).numpy()
+            policy, values = self.model(board, pieces, player).numpy()
         print(policy, values)
         return model_pb2.Prediction(policy=policy, value=values)
     
 
     def Train(self, request, context):
-        data = np.array(request.data).reshape(-1, 1, 14, 14)
-        data = torch.tensor(data, dtype=torch.float32)
-        target = np.array(request.target).reshape(-1, 1)
-        target = torch.tensor(target, dtype=torch.float32)
-        loss = self.model.train(data, target)
+        loss = 0
         return model_pb2.Status(value=loss)
 
 
