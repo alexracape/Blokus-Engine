@@ -1,5 +1,6 @@
 use blokus_model::blokus_model_client::BlokusModelClient;
 use blokus_model::State as ModelInput;
+use tonic::Response;
 
 
 pub mod blokus_model {
@@ -17,8 +18,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let response = client.predict(request).await?;
+    let prediction = response.into_inner();
+    let policy = prediction.policy;
+    let value = prediction.value;
 
-    println!("RESPONSE={:?}", response);
+    println!("POLICY={:?}", policy);
+    println!("VALUE={:?}", value);
 
     Ok(())
 }
