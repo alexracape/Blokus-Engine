@@ -12,6 +12,7 @@ const BOARD_SPACES: usize = 400;
 
 pub enum Action {
     PlacePiece(usize, usize, usize),
+    Pass,
     Undo,
     ResetGame,
 }
@@ -21,8 +22,7 @@ pub struct State {
     board: Board,
     players: Vec<Player>,
     move_stack: Vec<(usize, usize, usize)>,
-    current_player: usize,
-    players_remaining: Vec<usize>
+    current_player: usize,  // index of current player in players
 }
 
 impl Reducible for State {
@@ -53,7 +53,7 @@ impl Reducible for State {
                 // Remove piece from player and place piece
                 player.pieces.remove(p);
                 let used_spaces = new_state.board.place_piece(player, &piece, o);
-                new_state.current_player = (self.current_player + 1) % self.players.len();
+                new_state.current_player = self.next_player();
 
                 // Update anchors for all players
                 for player in &mut new_state.players {
@@ -66,13 +66,24 @@ impl Reducible for State {
                 // Return new state
                 new_state.into()
             }
+            Action::Pass => {
+                let mut new_state = (*self).clone();
+                new_state.players.remove(self.current_player);
+
+                if new_state.is_terminal() {
+                    return State::reset().into(); // TODO - need to handle better with message or something
+                }
+
+                new_state.current_player = self.current_player % new_state.players.len();
+                new_state.into()
+            }
             Action::Undo => {
                 let mut new_state = (*self).clone();
                 let (p, v, o) = new_state.move_stack.pop().unwrap();
                 let player = &new_state.players[self.current_player];
                 let piece = player.pieces[p].variants[v].clone();
                 new_state.board.remove_piece(player, &piece, o);
-                new_state.current_player =
+                new_state.current_player = 
                     (self.current_player + self.players.len() - 1) % self.players.len();
                 new_state.into()
             }
@@ -92,7 +103,6 @@ impl State {
             players,
             move_stack: Vec::new(),
             current_player: 0,
-            players_remaining: (0..5).collect() 
         }
     }
 
@@ -100,12 +110,16 @@ impl State {
         &self.board.board
     }
 
-    pub fn get_current_player_pieces(&self) -> Vec<Piece> {
-        self.players[self.current_player].pieces.clone()
+    pub fn next_player(&self) -> usize {
+        (self.current_player + 1) % self.players.len()
     }
 
-    pub fn get_current_player(&self) -> usize {
-        self.current_player
+    pub fn get_current_player(&self) -> u8 {
+        self.players[self.current_player].num
+    }
+
+    pub fn get_current_player_pieces(&self) -> Vec<Piece> {
+        self.players[self.current_player].pieces.clone()
     }
 
     pub fn get_current_anchors(&self) -> HashSet<usize> {
@@ -113,7 +127,7 @@ impl State {
     }
 
     pub fn is_terminal(&self) -> bool {
-        self.players_remaining.len() == 0
+        self.players.len() == 0
     }
 
     pub fn get_representation(&self) -> ([[bool; BOARD_SPACES]; 4], [[bool; 21]; 4]) {
