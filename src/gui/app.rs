@@ -31,6 +31,13 @@ pub fn App() -> Html {
         Callback::from(move |_| {state.dispatch(Action::ResetGame)})
     };
 
+    let on_pass = {
+        let state = state.clone();
+        Callback::from(move |_| {
+            state.dispatch(Action::Pass);
+        })
+    };
+
     html! {
         <div>
             <h1>{ "Blokus Engine" }</h1>
@@ -38,6 +45,7 @@ pub fn App() -> Html {
             <BlokusBoard board={state.get_board()} on_board_drop={on_board_drop} anchors={state.get_current_anchors()} />
             <PieceTray pieces={state.get_current_player_pieces()} player_num={state.get_current_player()} />
 
+            <button onclick={on_pass}>{ "Pass" }</button>            
             <button onclick={on_reset}>{ "Reset Game" }</button>
 
             <p style={"white-space: pre-line"}>{"
@@ -46,7 +54,6 @@ pub fn App() -> Html {
                 Flip Piece: f\n
                 Place Piece: Drag onto board\n
             "}</p>
-            // <button onclick={onclick}>{ "Place Piece" }</button>
         </div>
     }
 }

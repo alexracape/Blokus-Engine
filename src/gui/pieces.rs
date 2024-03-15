@@ -15,17 +15,17 @@ use web_sys::KeyboardEvent;
 #[derive(Properties, PartialEq)]
 pub struct Props {
     pub pieces: Vec<Piece>,
-    pub player_num: usize,
+    pub player_num: u8,
 }
 
 #[function_component]
 pub fn PieceTray(props: &Props) -> Html {
     
     let color = match props.player_num {
-        0 => "red",
-        1 => "blue",
-        2 => "green",
-        3 => "yellow",
+        1 => "red",
+        2 => "blue",
+        3 => "green",
+        4 => "yellow",
         _ => "empty"
     };
     html! {

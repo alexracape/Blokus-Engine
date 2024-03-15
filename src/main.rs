@@ -4,6 +4,7 @@ mod gui;
 mod pieces;
 mod player;
 mod state;
+
 mod simulation;
 
 use crate::gui::app::App;
