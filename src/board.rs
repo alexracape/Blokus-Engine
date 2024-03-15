@@ -48,6 +48,7 @@ impl Board {
     }
 
     /// Places a piece onto the board, assumes that the move is valid
+    /// Returns a set of spaces that the piece occupies, so that all players can update their anchors
     pub fn place_piece(&mut self, player: &mut Player, piece: &PieceVariant, offset: usize) -> HashSet<usize>{
 
         // Place piece on board
@@ -186,9 +187,10 @@ mod tests {
         let mut board = Board::new();
         let mut player = Player::new(1);
         let piece = PieceVariant::new(vec![vec![true, true]]);
-        board.place_piece(&mut player, &piece, 0);
+        let used_spaces = board.place_piece(&mut player, &piece, 0);
         assert_eq!(board.board[0], 0b1111_0001);
         assert_eq!(board.board[1], 0b1111_0001);
+        player.use_anchors(&used_spaces);
         println!("{:?}", player.get_anchors());
         assert_eq!(player.get_anchors().len(), 1);
         assert_eq!(player.get_anchors().contains(&22), true);
