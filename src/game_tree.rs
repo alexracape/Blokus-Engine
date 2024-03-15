@@ -1,6 +1,8 @@
-// Game Tree for MCTS
+// Game Tree to be used by each MCTS simulation
 
-struct Node {
+use crate::state::State;
+
+pub struct Node {
     state: State,
     children: Vec<Node>,
     parent: Option<Box<Node>>,
@@ -20,16 +22,20 @@ impl Node {
             prior: prior,
         }
     }
+
+    fn select_child(&self) -> Option<&Node> {
+        self.children.get(0)
+    }
 }
 
-struct GameTree {
+pub struct GameTree {
     root: Node,
 }
 
 impl GameTree {
     fn new() -> GameTree {
         GameTree {
-            root: Node::new(State::new()),
+            root: Node::new(State::reset(), 1.0),
         }
     }
 }
