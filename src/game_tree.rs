@@ -1,9 +1,10 @@
 // Game Tree to be used by each MCTS simulation
 
 use crate::state::State;
+use blokus_model::State as StateRep;
 
 pub struct Node {
-    state: State,
+    pub state: State,
     children: Vec<Node>,
     parent: Option<Box<Node>>,
     value_sum: u32,
@@ -26,14 +27,19 @@ impl Node {
     fn select_child(&self) -> Option<&Node> {
         self.children.get(0)
     }
+
+    pub fn get_representation(&self) -> StateRep {
+        let simple_rep = self.state.get_representation();
+        
+    }
 }
 
 pub struct GameTree {
-    root: Node,
+    pub root: Node,
 }
 
 impl GameTree {
-    fn new() -> GameTree {
+    pub fn new() -> GameTree {
         GameTree {
             root: Node::new(State::reset(), 1.0),
         }

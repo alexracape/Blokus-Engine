@@ -48,6 +48,9 @@ class BlokusModel(torch.nn.Module):
         policy = self.policy_head(x)
         value = self.value_head(x)
 
+        mask = torch.tensor(board[4], dtype=torch.float32)
+        policy = policy * mask
+
         return policy, value
 
 
