@@ -24,7 +24,6 @@ On Tap:
     - I could try to disable these modules for wasm build, but then I won't be able to use the 
     GUI to connect to the model. Maybe I could use another library later for that
 - Explore repeated tile moves and maybe tree to represent possible moves
-- Can I get rid of gloo console and use yew services console instead?
 - Handle game over in gui instead of just resetting (state.rs)
 
 Plan:
