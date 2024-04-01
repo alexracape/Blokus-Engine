@@ -1,6 +1,5 @@
 use blokus_model::blokus_model_client::BlokusModelClient;
 use blokus_model::State as StateRep;
-use tonic::Response;
 
 
 pub mod blokus_model {

@@ -19,7 +19,7 @@ pub enum Action {
 
 #[derive(Clone)]
 pub struct State {
-    board: Board,
+    pub board: Board,
     players: Vec<Player>,
     move_stack: Vec<(usize, usize, usize)>,
     current_player: usize,  // index of current player in players
@@ -124,6 +124,10 @@ impl State {
 
     pub fn get_current_anchors(&self) -> HashSet<usize> {
         self.players[self.current_player].get_anchors()
+    }
+
+    pub fn get_legal_moves(&self) -> Vec<(usize, usize, usize)> {
+        self.players[self.current_player].get_moves(&mut self.board)
     }
 
     pub fn is_terminal(&self) -> bool {
