@@ -1,5 +1,5 @@
 use blokus_model::blokus_model_client::BlokusModelClient;
-use blokus_model::State as StateRep;
+use blokus_model::StateRepresentation;
 
 
 pub mod blokus_model {
@@ -10,7 +10,7 @@ pub mod blokus_model {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = BlokusModelClient::connect("http://[::1]:50051").await?;
 
-    let request = tonic::Request::new(StateRep {
+    let request = tonic::Request::new(StateRepresentation {
         boards: vec![false; 400 * 5],
         player: 1,
     });

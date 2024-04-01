@@ -5,7 +5,7 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
-class State(_message.Message):
+class StateRepresentation(_message.Message):
     __slots__ = ("boards", "player")
     BOARDS_FIELD_NUMBER: _ClassVar[int]
     PLAYER_FIELD_NUMBER: _ClassVar[int]
@@ -22,12 +22,14 @@ class Prediction(_message.Message):
     def __init__(self, policy: _Optional[_Iterable[float]] = ..., value: _Optional[_Iterable[float]] = ...) -> None: ...
 
 class Data(_message.Message):
-    __slots__ = ("states", "predictions")
+    __slots__ = ("states", "policies", "values")
     STATES_FIELD_NUMBER: _ClassVar[int]
-    PREDICTIONS_FIELD_NUMBER: _ClassVar[int]
-    states: _containers.RepeatedCompositeFieldContainer[State]
-    predictions: _containers.RepeatedCompositeFieldContainer[Prediction]
-    def __init__(self, states: _Optional[_Iterable[_Union[State, _Mapping]]] = ..., predictions: _Optional[_Iterable[_Union[Prediction, _Mapping]]] = ...) -> None: ...
+    POLICIES_FIELD_NUMBER: _ClassVar[int]
+    VALUES_FIELD_NUMBER: _ClassVar[int]
+    states: _containers.RepeatedCompositeFieldContainer[StateRepresentation]
+    policies: _containers.RepeatedScalarFieldContainer[float]
+    values: _containers.RepeatedScalarFieldContainer[float]
+    def __init__(self, states: _Optional[_Iterable[_Union[StateRepresentation, _Mapping]]] = ..., policies: _Optional[_Iterable[float]] = ..., values: _Optional[_Iterable[float]] = ...) -> None: ...
 
 class Status(_message.Message):
     __slots__ = ("code",)

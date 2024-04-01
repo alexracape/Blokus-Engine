@@ -55,7 +55,7 @@ impl Player {
 
     /// Gets all possible moves for a piece
     /// Returns a list of (variant, offset) tuples
-    pub fn get_piece_moves(&self, piece: &Piece, board: &mut Board) -> Vec<(usize, usize)> {
+    pub fn get_piece_moves(&self, piece: &Piece, board: &Board) -> Vec<(usize, usize)> {
         let mut moves = Vec::new();
         for anchor in &self.anchors {
             
@@ -81,7 +81,7 @@ impl Player {
 
     /// Gets all possible moves for a player
     /// Returns a list of indices (piece, variant, offset) tuples
-    pub fn get_moves(&self, board: &mut Board) -> Vec<(usize, usize, usize)> {
+    pub fn get_moves(&self, board: &Board) -> Vec<(usize, usize, usize)> {
         let mut moves = Vec::new();
         for (i, piece) in self.pieces.iter().enumerate() {
             for (variant, offset) in self.get_piece_moves(piece, board) {

@@ -16,7 +16,7 @@ class BlokusModelStub(object):
         """
         self.Predict = channel.unary_unary(
                 '/blokusmodel.BlokusModel/Predict',
-                request_serializer=model__pb2.State.SerializeToString,
+                request_serializer=model__pb2.StateRepresentation.SerializeToString,
                 response_deserializer=model__pb2.Prediction.FromString,
                 )
         self.Train = channel.unary_unary(
@@ -46,7 +46,7 @@ def add_BlokusModelServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Predict': grpc.unary_unary_rpc_method_handler(
                     servicer.Predict,
-                    request_deserializer=model__pb2.State.FromString,
+                    request_deserializer=model__pb2.StateRepresentation.FromString,
                     response_serializer=model__pb2.Prediction.SerializeToString,
             ),
             'Train': grpc.unary_unary_rpc_method_handler(
@@ -76,7 +76,7 @@ class BlokusModel(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/blokusmodel.BlokusModel/Predict',
-            model__pb2.State.SerializeToString,
+            model__pb2.StateRepresentation.SerializeToString,
             model__pb2.Prediction.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
