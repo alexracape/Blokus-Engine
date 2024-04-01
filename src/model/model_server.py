@@ -36,7 +36,7 @@ class BlokusModel(torch.nn.Module):
         with the valid moves for the current player. For now, I'm just going to use the boards.
         It is unclear why the player color is needed in the state.
         """
-        
+        # print(board.shape)
         x = self.relu(self.conv1(board))
         x = self.relu(self.conv2(x))
         x = self.relu(self.conv3(x))
@@ -48,7 +48,7 @@ class BlokusModel(torch.nn.Module):
         policy = self.policy_head(x)
         value = self.value_head(x)
 
-        mask = torch.tensor(board[4], dtype=torch.float32)
+        mask = torch.tensor(board[4], dtype=torch.float32).flatten()
         policy = policy * mask
 
         return policy, value
@@ -73,7 +73,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         else:
             self.model = BlokusModel().to(self.device)
 
-        summary(self.model, [(5, 20, 20), (1, 1, 1)])
+        # summary(self.model, [(5, 20, 20), (1, 1, 1)]) # for some reason dimension when summarizing is (2, 5, 20, 20)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.01)
         self.loss = torch.nn.MSELoss().to(self.device)  # Might need to change to custom
 
@@ -81,6 +81,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         
         print("Predicting...")
         boards = np.array(request.boards).reshape(5, 20, 20)
+        print(boards.shape)
         player = request.player
 
         boards = torch.tensor(boards, dtype=torch.float32).to(self.device)

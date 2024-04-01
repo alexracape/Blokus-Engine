@@ -170,6 +170,7 @@ version = "0.1.0"
 dependencies = [
  "gloo-console 0.3.0",
  "prost",
+ "rand",
  "tokio",
  "tonic",
  "tonic-build",

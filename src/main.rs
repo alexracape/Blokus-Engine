@@ -2,10 +2,10 @@ mod board;
 mod gui;
 mod pieces;
 mod player;
-mod state;
+mod game;
 
 mod simulation;
-mod game_tree;
+mod node;
 
 pub mod grpc {
     tonic::include_proto!("blokusmodel");
