@@ -4,6 +4,7 @@ use std::rc::Rc;
 use gloo_console as console;
 use yew::prelude::*;
 
+use crate::grpc::StateRepresentation;
 use crate::board::Board;
 use crate::pieces::Piece;
 use crate::player::Player;
@@ -18,14 +19,14 @@ pub enum Action {
 }
 
 #[derive(Clone)]
-pub struct State {
+pub struct Game {
     pub board: Board,
     players: Vec<Player>,
-    move_stack: Vec<(usize, usize, usize)>,
+    history: Vec<(usize, usize, usize)>, // (piece, variant, offset)
     current_player: usize,  // index of current player in players
 }
 
-impl Reducible for State {
+impl Reducible for Game {
     type Action = Action;
 
     fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
@@ -60,8 +61,8 @@ impl Reducible for State {
                     player.use_anchors(&used_spaces);
                 }
 
-                // Add move to stack
-                new_state.move_stack.push((p, v, o));
+                // Add move to stack - TODO NEED TO GET TILE BY TILE FOR MOVE
+                new_state.history.push((p, v, o));
 
                 // Return new state
                 new_state.into()
@@ -71,7 +72,7 @@ impl Reducible for State {
                 new_state.players.remove(self.current_player);
 
                 if new_state.is_terminal() {
-                    return State::reset().into(); // TODO - need to handle better with message or something
+                    return Game::reset().into(); // TODO - need to handle better with message or something
                 }
 
                 new_state.current_player = self.current_player % new_state.players.len();
@@ -79,7 +80,7 @@ impl Reducible for State {
             }
             Action::Undo => {
                 let mut new_state = (*self).clone();
-                let (p, v, o) = new_state.move_stack.pop().unwrap();
+                let (p, v, o) = new_state.history.pop().unwrap();
                 let player = &new_state.players[self.current_player];
                 let piece = player.pieces[p].variants[v].clone();
                 new_state.board.remove_piece(player, &piece, o);
@@ -87,21 +88,21 @@ impl Reducible for State {
                     (self.current_player + self.players.len() - 1) % self.players.len();
                 new_state.into()
             }
-            Action::ResetGame => State::reset().into(),
+            Action::ResetGame => Game::reset().into(),
         }
     }
 }
 
-impl State {
+impl Game {
     pub fn reset() -> Self {
         let mut players = Vec::new();
         for i in 1..5 {
             players.push(Player::new(i));
         }
-        State {
+        Game {
             board: Board::new(),
             players,
-            move_stack: Vec::new(),
+            history: Vec::new(),
             current_player: 0,
         }
     }
@@ -114,8 +115,8 @@ impl State {
         (self.current_player + 1) % self.players.len()
     }
 
-    pub fn get_current_player(&self) -> u8 {
-        self.players[self.current_player].num
+    pub fn current_player(&self) -> usize {
+        self.current_player
     }
 
     pub fn get_current_player_pieces(&self) -> Vec<Piece> {
@@ -134,10 +135,13 @@ impl State {
         self.players.len() == 0
     }
 
-    pub fn get_representation(&self) -> ([[bool; BOARD_SPACES]; 4], [[bool; 21]; 4]) {
-        // Get rep of the board where players pieces are divided to seperate boards
+    /// Get a representation of the state for the neural network
+    /// This representation includes the board and the legal tiles
+    pub fn get_representation(&self) -> StateRepresentation {
+
+        // Get rep for the pieces on the board
         let board = &self.board.board;
-        let mut board_rep = [[false; BOARD_SPACES]; 4];
+        let mut board_rep = [[false; BOARD_SPACES]; 5];
         for i in 0..BOARD_SPACES {
             let player = board[i] & 0b1111; // check if there is a player piece
             if player != 0 {
@@ -145,14 +149,27 @@ impl State {
             }
         }
 
-        // Get rep of pieces remaining for each player
-        let mut pieces_rep = [[false; 21]; 4];
-        for i in 0..4 {
-            for piece in &self.players[i].pieces {
-                pieces_rep[i][piece.id] = true;
+        // Get rep for the legal spaces
+        let legal_moves = self.get_legal_moves();
+        for (piece, variant, offset) in legal_moves {
+            let variant = &self.get_current_player_pieces()[piece].variants[variant];
+            let shape = variant.get_shape();
+            
+            // Mark legal spaces on the representation
+            for i in 0..shape.len() {
+                for j in 0..shape[i].len() {
+                    if shape[i][j] {
+                        let global_offset = offset + i * 20 + j;
+                        board_rep[4][global_offset] = true;
+                    }
+                }
             }
         }
 
-        (board_rep, pieces_rep)
+        StateRepresentation {
+            boards: board_rep.into_iter().flat_map(|inner| inner).collect(),
+            player: self.current_player() as i32,
+        }
+
     }
 }

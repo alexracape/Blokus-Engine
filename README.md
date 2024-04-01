@@ -27,10 +27,10 @@ On Tap:
 - Handle game over in gui instead of just resetting (state.rs)
 
 Plan:
-1. Fill in logic for ending the game
-2. Set up MCTS
-3. Explore repeated moves approach
+1. Add logic to game.rs to handle incremental moves
+2. Wrap up self-play simulation
 
 References
 - https://sebastianbodenstein.com/post/alphazero/
 - https://arxiv.org/pdf/1712.01815.pdf
+- https://arc.net/folder/7FE3479D-1752-401F-9DC3-49AAD02B5DF3
