@@ -21,7 +21,7 @@ impl Board {
         }
     }
 
-    pub fn is_valid_move(&mut self, player: &Player, piece_variant: &PieceVariant, offset: usize) -> bool {
+    pub fn is_valid_move(&self, player: &Player, piece_variant: &PieceVariant, offset: usize) -> bool {
 
         // Check piece is within bounds and does not go over edge of board
         let variant = &piece_variant.variant;
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn test_is_valid_move() {
-        let mut board = Board::new();
+        let board = Board::new();
         let player = Player::new(1);
         let piece = PieceVariant::new(vec![vec![true, true]]);
         assert_eq!(board.is_valid_move(&player, &piece, 0), true);

@@ -127,7 +127,7 @@ impl State {
     }
 
     pub fn get_legal_moves(&self) -> Vec<(usize, usize, usize)> {
-        self.players[self.current_player].get_moves(&mut self.board)
+        self.players[self.current_player].get_moves(&self.board)
     }
 
     pub fn is_terminal(&self) -> bool {

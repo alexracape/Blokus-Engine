@@ -1,11 +1,15 @@
 mod board;
-mod game_tree;
 mod gui;
 mod pieces;
 mod player;
 mod state;
 
 mod simulation;
+mod game_tree;
+
+pub mod grpc {
+    tonic::include_proto!("blokusmodel");
+}
 
 use crate::gui::app::App;
 

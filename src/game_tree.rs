@@ -1,5 +1,5 @@
 // Game Tree to be used by each MCTS simulation
-use blokus_model::State as StateRep;
+use crate::grpc::StateRepresentation;
 
 use crate::state::State;
 
@@ -32,8 +32,8 @@ impl Node {
     }
 
     /// Expand the tree by adding children to the current node
-    pub fn get_children(&self) -> () {
-        self.children.push(Node::new(self.state, 0, 0.0));
+    pub fn get_children(&mut self) -> () {
+        self.children.push(Node::new(self.state.clone(), 0, 0.0));
     }
 
     /// Select a child node to explore
@@ -53,7 +53,7 @@ impl Node {
 
     /// Get a representation of the state for the neural network
     /// This representation includes the board and the legal tiles
-    pub fn get_representation(&self) -> StateRep {
+    pub fn get_representation(&self) -> StateRepresentation {
 
         // Get rep for the pieces on the board
         let mut board_rep = [[false; BOARD_SPACES]; 5];
@@ -62,7 +62,7 @@ impl Node {
         // Get rep for the legal spaces
         let legal_moves = self.state.get_legal_moves();
         for (piece, variant, offset) in legal_moves {
-            let variant = self.state.get_current_player_pieces()[piece].variants[variant];
+            let variant = &self.state.get_current_player_pieces()[piece].variants[variant];
             let shape = variant.get_shape();
             
             // Mark legal spaces on the representation
@@ -76,8 +76,9 @@ impl Node {
             }
         }
 
-        StateRep {
-            board: board_rep,
+        StateRepresentation {
+            boards: board_rep.into_iter().flat_map(|inner| inner).collect(),
+            player: self.state.get_current_player() as i32,
         }
 
     }
