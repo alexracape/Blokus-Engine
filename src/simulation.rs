@@ -40,7 +40,7 @@ async fn evaluate(node: &mut Node, game: &Game, model: &mut BlokusModelClient<Ch
     let total: f32 = exp_policy.iter().map(|(_, p)| p).sum();
     
     // Expand the node with the policy
-    node.set_player(game.current_player());
+    node.to_play = game.current_player();
     for (tile, prob) in exp_policy {
         node.children.insert(tile, Node::new(prob / total));
     }
@@ -52,7 +52,7 @@ async fn evaluate(node: &mut Node, game: &Game, model: &mut BlokusModelClient<Ch
 /// Select child node to explore
 /// Uses UCB1 formula to balance exploration and exploitation
 /// Returns the action and the child node
-fn select_child(node: Node) -> (usize, Node) {
+fn select_child(node: &Node) -> (usize, &mut Node) {
     let mut best_score = 0.0;
     let mut best_tile = 0;
     let mut best_child = Node::new(0.0);
@@ -64,7 +64,7 @@ fn select_child(node: Node) -> (usize, Node) {
             best_child = child;
         }
     }
-    (best_tile, best_child)
+    (best_tile, &mut best_child)
 }
 
 
@@ -87,12 +87,13 @@ fn select_action(policy: Vec<f32>) -> usize {
 
 
 /// Update node when visitied during backpropagation
-fn backpropagate(search_path: Vec<Node>, values: Vec<f32>) -> () {
+fn backpropagate(search_path: Vec<usize>, root: &Node, values: Vec<f32>) -> () {
 
-    for mut node in search_path {
-        let player = node.to_play;
+    let node = root;
+    for tile in search_path {
+        let node = node.children.get_mut(&tile).unwrap();
         node.visits += 1;
-        node.value_sum += values[player];
+        node.value_sum += values[node.to_play];
     }
 }
 
@@ -101,33 +102,32 @@ fn backpropagate(search_path: Vec<Node>, values: Vec<f32>) -> () {
 async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>) -> Result<Vec<f32>, Box<dyn std::error::Error>>{
     
     // Initialize root for these sims, evaluate it, and add children
-    let root = Node::new(0.0);
+    let mut root = Node::new(0.0);
     evaluate(&mut root, game, model);
     // TODO: Add noise to tree
 
     for _ in 0..SIMULATIONS {
 
         // Select a leaf node
-        let node = root;
+        let mut node = &mut root;
         let scratch_game = game.clone();
-        let search_path = vec![node];
-        let action = 0;
+        let mut search_path = Vec::new();
         while !node.is_leaf() {
             let (action, node) = select_child(node);
-            scratch_game.apply(action); // TODO: Need to implement apply and tile based moves
-            search_path.push(node);
+            scratch_game.apply(action); 
+            search_path.push(action);
         }
 
         // Expand and evaluate the leaf node
         let values = evaluate(&mut node, &scratch_game, model).await?;
 
         // Backpropagate the value
-        backpropagate(search_path, values)
+        backpropagate(search_path, &root, values) // Pass reference to node
     }
 
     // Return the policy for the root node
-    let total_visits: u32 = root.children.iter().map(|(tile, node)| node.visits).sum();
-    let policy = vec![0.0; 400];
+    let total_visits: u32 = root.children.iter().map(|(tile, child)| child.visits).sum();
+    let mut policy = vec![0.0; 400];
     for (tile, node) in root.children {
         policy[tile] = node.visits as f32 / total_visits as f32;
     }
@@ -150,8 +150,8 @@ async fn play_game() -> Result<(), Box<dyn std::error::Error>> {
     while !game.is_terminal() {
 
         // Get MCTS policy for current state
-        let policy = &mut mcts(&game, &mut model).await?;
-        policies.append(policy);
+        let mut policy = mcts(&game, &mut model).await?;
+        policies.append(&mut policy);
         states.push(game.get_representation());
 
 
@@ -165,7 +165,7 @@ async fn play_game() -> Result<(), Box<dyn std::error::Error>> {
     let data = tonic::Request::new(DataRep {
         states: states,
         policies: policies,
-        values: game.get_payoffs(),
+        values: game.get_payoff(),
     });
     model.train(data).await?;
 

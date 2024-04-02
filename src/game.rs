@@ -22,7 +22,7 @@ pub enum Action {
 pub struct Game {
     pub board: Board,
     players: Vec<Player>,
-    history: Vec<(usize, usize, usize)>, // (piece, variant, offset)
+    history: Vec<Vec<usize>>, // each row is a move consisting of its tiles
     current_player: usize,  // index of current player in players
 }
 
@@ -61,8 +61,8 @@ impl Reducible for Game {
                     player.use_anchors(&used_spaces);
                 }
 
-                // Add move to stack - TODO NEED TO GET TILE BY TILE FOR MOVE
-                new_state.history.push((p, v, o));
+                // Add move to stack
+                new_state.history.push(used_spaces.into_iter().collect());
 
                 // Return new state
                 new_state.into()
@@ -80,12 +80,9 @@ impl Reducible for Game {
             }
             Action::Undo => {
                 let mut new_state = (*self).clone();
-                let (p, v, o) = new_state.history.pop().unwrap();
+                let last_move = new_state.history.pop().unwrap();
                 let player = &new_state.players[self.current_player];
-                let piece = player.pieces[p].variants[v].clone();
-                new_state.board.remove_piece(player, &piece, o);
-                new_state.current_player = 
-                    (self.current_player + self.players.len() - 1) % self.players.len();
+                // TODO: Need to implement undo
                 new_state.into()
             }
             Action::ResetGame => Game::reset().into(),
@@ -105,6 +102,12 @@ impl Game {
             history: Vec::new(),
             current_player: 0,
         }
+    }
+
+    pub fn apply(&self, tile: usize) -> () {
+
+        self.board.board[tile] = 0b1111_0000 | self.current_player as u8 + 1;
+
     }
 
     pub fn get_board(&self) -> &[u8; BOARD_SPACES] {
@@ -131,6 +134,10 @@ impl Game {
         self.players[self.current_player].get_moves(&self.board)
     }
 
+    pub fn get_payoff(&self) -> Vec<f32> {
+        vec![0.0; 4] // TODO: flesh out
+    }
+
     pub fn is_terminal(&self) -> bool {
         self.players.len() == 0
     }
@@ -150,7 +157,7 @@ impl Game {
         }
 
         // Get rep for the legal spaces
-        let legal_moves = self.get_legal_moves();
+        let legal_moves = self.legal_tiles();
         for (piece, variant, offset) in legal_moves {
             let variant = &self.get_current_player_pieces()[piece].variants[variant];
             let shape = variant.get_shape();
