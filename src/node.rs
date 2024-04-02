@@ -24,18 +24,7 @@ impl Node {
             visits: 0,
             prior: prior,
         }
-    }
-
-    /// Select a child node to explore
-    pub fn select_child(&self) -> Option<&mut Node> {
-        // TODO
-        None
-    }
-
-    /// Set current player
-    pub fn set_player(&mut self, player: usize) {
-        self.to_play = player;
-    }
+    }   
 
     /// Is the node a leaf
     pub fn is_leaf(&self) -> bool {

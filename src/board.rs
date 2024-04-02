@@ -55,6 +55,7 @@ impl Board {
         let shape = &piece.variant;
         let fully_restricted: u8 = 0b1111_0000;
         let player_restricted: u8 = 1 << player.num + 3;
+        let fill_value = fully_restricted | player.num;
         let mut new_anchor_candidates = HashSet::new();
         let mut used_spaces = HashSet::new();
         for i in 0..shape.len() {
@@ -66,7 +67,7 @@ impl Board {
             let space = offset + i;
             used_spaces.insert(space);
 
-            self.board[space] = fully_restricted | player.num;
+            self.board[space] = fill_value;
             println!("{} {}", offset + i, fully_restricted | player.num);
 
             // Restrict adjacent squares
