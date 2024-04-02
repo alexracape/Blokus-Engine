@@ -25,6 +25,9 @@ On Tap:
     GUI to connect to the model. Maybe I could use another library later for that
 - Explore repeated tile moves and maybe tree to represent possible moves
 - Handle game over in gui instead of just resetting (state.rs)
+- Refactor player to disentangle functions for moves and game state - is player struct really necessary?
+- Piece variants seem like a mess, is it worth refactoring?
+    - I made it thinking about the bit boards, but now there are also a lot of shape applications
 
 Plan:
 1. Add logic to game.rs to handle incremental moves

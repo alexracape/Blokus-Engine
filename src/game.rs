@@ -1,4 +1,5 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 use std::rc::Rc;
 
 use gloo_console as console;
@@ -18,12 +19,69 @@ pub enum Action {
     ResetGame,
 }
 
+
+/// Get the legal moves for a piece
+fn get_piece_moves(piece: &Piece, board: &Board, player: &Player) -> Vec<Vec<usize>> {
+    let mut moves = Vec::new();
+    for anchor in &player.get_anchors() {
+        for variant in &piece.variants {
+            for offset in &variant.offsets {
+
+                // Check underflow
+                if offset > anchor {
+                    continue;
+                }
+
+                let total_offset = anchor - offset; // offset to anchor, then offset to line up piece
+                if board.is_valid_move(player, variant, total_offset) {
+                    let mut tiles = Vec::new();
+                    for (i, square) in variant.variant.iter().enumerate() {
+                        if *square {
+                            tiles.push(total_offset + i);
+                        }
+                    }
+                    moves.push(tiles);
+                }
+
+                if board.is_valid_move(player, variant, anchor + offset) {
+                    moves.push(vec![piece.id, piece.variants.iter().position(|v| v == variant).unwrap(), anchor + offset]);
+                }
+            }
+        }
+    }
+
+    moves
+}
+
+
+/// Get the legal moves for a player, tile placements grouped by move
+fn get_moves(board: &Board, player: &Player) -> Vec<Vec<usize>> {
+    let mut moves = Vec::new();
+    for piece in &player.pieces {
+        let piece_moves = get_piece_moves(piece, board, player);
+        moves.extend(piece_moves);
+    }
+
+    moves
+}
+
+
+/// Get the tile bases representation for legal moves
+fn get_tile_moves(board: &Board, player: &Player) -> HashMap<usize, HashSet<usize>> {
+    let mut tile_rep = HashMap::new();
+    let mut moves = get_moves(board, player);
+    
+    moves
+}
+
+
 #[derive(Clone)]
 pub struct Game {
     pub board: Board,
     players: Vec<Player>,
     history: Vec<Vec<usize>>, // each row is a move consisting of its tiles
     current_player: usize,  // index of current player in players
+    legal_tiles: HashMap<usize, HashSet<usize>> // Map tile to index of the overall move
 }
 
 impl Reducible for Game {
@@ -101,12 +159,29 @@ impl Game {
             players,
             history: Vec::new(),
             current_player: 0,
+            legal_tiles: HashMap::new(),
         }
     }
 
     pub fn apply(&self, tile: usize) -> () {
 
-        self.board.board[tile] = 0b1111_0000 | self.current_player as u8 + 1;
+        // Place piece on board
+        self.board.place_tile(tile, self.current_player as u8);
+
+        // Update legal tiles
+        let valid_moves = self.legal_tiles.remove(&tile).unwrap();
+        for (tile, move_set) in self.legal_tiles {
+            move_set.iter().filter(|m| !valid_moves.contains(m));
+            if move_set.len() < 1 {
+                self.legal_tiles.remove(&tile);
+            }
+        }
+
+        // Advance to next player if necessary
+        while self.legal_tiles.len() == 0 && !self.is_terminal(){
+            self.current_player = self.next_player();
+            self.legal_tiles = get_tile_moves(&self.board, &self.players[self.current_player]);
+        }
 
     }
 
@@ -130,8 +205,16 @@ impl Game {
         self.players[self.current_player].get_anchors()
     }
 
-    pub fn get_legal_moves(&self) -> Vec<(usize, usize, usize)> {
-        self.players[self.current_player].get_moves(&self.board)
+    pub fn get_legal_moves(&self) -> HashMap<usize, HashSet<usize>> {
+        
+        let moves = self.players[self.current_player].get_moves(&self.board);
+        let mut legal_moves = HashMap::new();
+
+
+    }
+
+    pub fn legal_tiles(&self) -> Vec<usize> {
+        self.legal_tiles.keys().map(|k| *k).collect()
     }
 
     pub fn get_payoff(&self) -> Vec<f32> {

@@ -47,6 +47,13 @@ impl Board {
         on_blanks && on_anchor
     }
 
+    
+    /// Place a tile on the board
+    pub fn place_tile(&mut self, tile: usize, player: u8) {
+        self.board[tile] = 0b1111_0000 | (player + 1);
+        // TODO: may need more logic here to account for anchors or other things
+    }
+
     /// Places a piece onto the board, assumes that the move is valid
     /// Returns a set of spaces that the piece occupies, so that all players can update their anchors
     pub fn place_piece(&mut self, player: &mut Player, piece: &PieceVariant, offset: usize) -> HashSet<usize>{
