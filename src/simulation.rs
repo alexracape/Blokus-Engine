@@ -1,10 +1,8 @@
 // One game of self-play using MCTS and a neural network
 use rand::Rng;
-use std::fmt::Error;
 use std::vec;
 
 use crate::grpc::blokus_model_client::BlokusModelClient;
-use crate::grpc::Prediction as PredRep;
 use crate::grpc::Data as DataRep;
 
 use tonic::transport::Channel;
@@ -13,9 +11,7 @@ use crate::node::Node;
 use crate::game::Game;
 
 
-const SELF_PLAY_GAMES: usize = 100;
 const SIMULATIONS: usize = 100;
-const SERVER_ADDRESS: &str = "localhost:8000";
 
 
 /// Evaluate and Expand the Node
@@ -51,20 +47,18 @@ async fn evaluate(node: &mut Node, game: &Game, model: &mut BlokusModelClient<Ch
 
 /// Select child node to explore
 /// Uses UCB1 formula to balance exploration and exploitation
-/// Returns the action and the child node
-fn select_child(node: &Node) -> (usize, &mut Node) {
+/// Returns the action and the child node's key
+fn select_child(node: &Node) -> usize {
     let mut best_score = 0.0;
     let mut best_tile = 0;
-    let mut best_child = Node::new(0.0);
-    for (tile, child) in node.children {
+    for (tile, child) in &node.children {
         let score = child.value_sum / child.visits as f32 + 1.41 * (node.visits as f32).sqrt() / (1.0 + child.visits as f32).sqrt();
         if score > best_score {
             best_score = score;
-            best_tile = tile;
-            best_child = child;
+            best_tile = *tile;
         }
     }
-    (best_tile, &mut best_child)
+    best_tile
 }
 
 
@@ -87,7 +81,7 @@ fn select_action(policy: Vec<f32>) -> usize {
 
 
 /// Update node when visitied during backpropagation
-fn backpropagate(search_path: Vec<usize>, root: &Node, values: Vec<f32>) -> () {
+fn backpropagate(search_path: Vec<usize>, root: &mut Node, values: Vec<f32>) -> () {
 
     let node = root;
     for tile in search_path {
@@ -110,10 +104,10 @@ async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>) -> Result<Vec
 
         // Select a leaf node
         let mut node = &mut root;
-        let scratch_game = game.clone();
+        let mut scratch_game = game.clone();
         let mut search_path = Vec::new();
         while !node.is_leaf() {
-            let (action, node) = select_child(node);
+            let action = select_child(node);
             scratch_game.apply(action); 
             search_path.push(action);
         }
@@ -122,7 +116,7 @@ async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>) -> Result<Vec
         let values = evaluate(&mut node, &scratch_game, model).await?;
 
         // Backpropagate the value
-        backpropagate(search_path, &root, values) // Pass reference to node
+        backpropagate(search_path, &mut root, values) // Pass reference to node
     }
 
     // Return the policy for the root node
@@ -138,10 +132,10 @@ async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>) -> Result<Vec
 
 
 #[tokio::main]
-async fn play_game() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn play_game(server_address: String) -> Result<(), Box<dyn std::error::Error>> {
 
     // Connect to neural network
-    let mut model = BlokusModelClient::connect("http://[::1]:50051").await?;
+    let mut model = BlokusModelClient::connect(server_address).await?;
 
     // Run self-play to generate data
     let mut game = Game::reset();
