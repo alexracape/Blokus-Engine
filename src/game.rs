@@ -42,10 +42,6 @@ fn get_piece_moves(piece: &Piece, board: &Board, player: &Player) -> Vec<Vec<usi
                     }
                     moves.push(tiles);
                 }
-
-                if board.is_valid_move(player, variant, anchor + offset) {
-                    moves.push(vec![piece.id, piece.variants.iter().position(|v| v == variant).unwrap(), anchor + offset]);
-                }
             }
         }
     }
@@ -71,7 +67,16 @@ fn get_tile_moves(board: &Board, player: &Player) -> HashMap<usize, HashSet<usiz
     let mut tile_rep = HashMap::new();
     let mut moves = get_moves(board, player);
     
-    moves
+    for (i, tiles) in moves.iter().enumerate() {
+        for tile in tiles {
+            if !tile_rep.contains_key(tile) {
+                tile_rep.insert(*tile, HashSet::new());
+            }
+            tile_rep.get_mut(tile).unwrap().insert(i);
+        }
+    }
+
+    tile_rep
 }
 
 
@@ -163,14 +168,14 @@ impl Game {
         }
     }
 
-    pub fn apply(&self, tile: usize) -> () {
+    pub fn apply(&mut self, tile: usize) -> () {
 
         // Place piece on board
         self.board.place_tile(tile, self.current_player as u8);
 
         // Update legal tiles
         let valid_moves = self.legal_tiles.remove(&tile).unwrap();
-        for (tile, move_set) in self.legal_tiles {
+        for (tile, move_set) in self.legal_tiles.clone() {
             move_set.iter().filter(|m| !valid_moves.contains(m));
             if move_set.len() < 1 {
                 self.legal_tiles.remove(&tile);
@@ -205,14 +210,6 @@ impl Game {
         self.players[self.current_player].get_anchors()
     }
 
-    pub fn get_legal_moves(&self) -> HashMap<usize, HashSet<usize>> {
-        
-        let moves = self.players[self.current_player].get_moves(&self.board);
-        let mut legal_moves = HashMap::new();
-
-
-    }
-
     pub fn legal_tiles(&self) -> Vec<usize> {
         self.legal_tiles.keys().map(|k| *k).collect()
     }
@@ -241,19 +238,8 @@ impl Game {
 
         // Get rep for the legal spaces
         let legal_moves = self.legal_tiles();
-        for (piece, variant, offset) in legal_moves {
-            let variant = &self.get_current_player_pieces()[piece].variants[variant];
-            let shape = variant.get_shape();
-            
-            // Mark legal spaces on the representation
-            for i in 0..shape.len() {
-                for j in 0..shape[i].len() {
-                    if shape[i][j] {
-                        let global_offset = offset + i * 20 + j;
-                        board_rep[4][global_offset] = true;
-                    }
-                }
-            }
+        for tile in legal_moves {
+            board_rep[4][tile] = true;
         }
 
         StateRepresentation {
