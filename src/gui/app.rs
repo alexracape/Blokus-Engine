@@ -2,14 +2,14 @@
 use gloo_console as console;
 use yew::prelude::*;
 
-use crate::state::{State, Action};
+use crate::game::{Game, Action};
 use crate::gui::board::BlokusBoard;
 use crate::gui::pieces::PieceTray;
 
 #[function_component]
 pub fn App() -> Html {
 
-    let state = use_reducer(State::reset);
+    let state = use_reducer(Game::reset);
 
     let on_board_drop = {
         let state = state.clone();
@@ -43,7 +43,7 @@ pub fn App() -> Html {
             <h1>{ "Blokus Engine" }</h1>
             
             <BlokusBoard board={state.get_board()} on_board_drop={on_board_drop} anchors={state.get_current_anchors()} />
-            <PieceTray pieces={state.get_current_player_pieces()} player_num={state.get_current_player()} />
+            <PieceTray pieces={state.get_current_player_pieces()} player_num={state.current_player() as u8 + 1} />
 
             <button onclick={on_pass}>{ "Pass" }</button>            
             <button onclick={on_reset}>{ "Reset Game" }</button>
