@@ -87,10 +87,11 @@ fn get_tile_moves(board: &Board, player: usize, ) -> HashMap<usize, HashSet<(usi
 #[derive(Clone)]
 pub struct Game {
     pub board: Board,
-    history: Vec<Vec<usize>>, // each row is a move consisting of its tiles
-    players_remaining: Vec<usize>, // indices of players still in the game
-    player_index: usize, // index of the current player in players_remaining
-    legal_tiles: HashMap<usize, HashSet<(usize, usize, usize)>> // Map tile to index of the overall move
+    history: Vec<Vec<usize>>, // Each row is a move consisting of its tiles
+    players_remaining: Vec<usize>, // Indices of players still in the game
+    player_index: usize, // Index of the current player in players_remaining
+    legal_tiles: HashMap<usize, HashSet<(usize, usize, usize)>>, // Map tile to index of the overall move
+    last_piece_lens: [u32; 4], // Size of the last piece placed by each player
 }
 
 impl Reducible for Game {
@@ -157,6 +158,7 @@ impl Game {
             players_remaining: vec![0, 1, 2, 3],
             player_index: 0,
             legal_tiles: legal_tiles,
+            last_piece_lens: [0; 4],
         }
     }
 
@@ -183,6 +185,7 @@ impl Game {
 
             // Removing the player's piece
             let (piece, _variant, _offset) = valid_moves.iter().next().unwrap();
+            self.last_piece_lens[self.current_player()] = self.board.get_pieces(self.current_player()).remove(*piece).points;
             self.board.use_piece(self.current_player(), *piece);
 
             // Advance to next player
@@ -232,8 +235,28 @@ impl Game {
         self.legal_tiles.keys().map(|k| *k).collect()
     }
 
+    /// Player fewest tiles remaining wins
     pub fn get_payoff(&self) -> Vec<f32> {
-        vec![0.0; 4] // TODO: flesh out
+        let scores = self.board.get_scores(self.last_piece_lens);
+        let mut payoff = vec![0.0; 4];
+        let mut indices = Vec::new();
+        let mut highest_score = scores[0];
+        for (i, score) in scores.iter().enumerate() {
+            if *score == highest_score {
+                indices.push(i);
+            } else if *score > highest_score {
+                indices.clear();
+                indices.push(i);
+                highest_score = *score;
+            }
+        }
+        
+        for i in &indices {
+            payoff[*i] = 1.0 / indices.len() as f32;
+        }
+
+        println!("Scores: {:?}", scores);
+        payoff
     }
 
     pub fn is_terminal(&self) -> bool {
