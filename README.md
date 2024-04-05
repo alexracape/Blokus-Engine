@@ -17,20 +17,22 @@ Generate server code: `python -m grpc_tools.protoc -Iproto --python_out=./src/mo
 On Tap:
 - Undo
 - Benchmark board performance
-- Simulation for self-play
-    - MCTS
 - Something is up with trunk server now, lots of compilation errors
     - This is due to parts or tokio / tonic that are incompatible with wasm
     - I could try to disable these modules for wasm build, but then I won't be able to use the 
     GUI to connect to the model. Maybe I could use another library later for that
-- Explore repeated tile moves and maybe tree to represent possible moves
 - Handle game over in gui instead of just resetting (state.rs)
+- Refactor player to disentangle functions for moves and game state - is player struct really necessary?
+- Piece variants seem like a mess, is it worth refactoring?
+    - I made it thinking about the bit boards, but now there are also a lot of shape applications
+- Add noise to the MCTS
+- Update the way moves are applied for GUI
 
 Plan:
-1. Fill in logic for ending the game
-2. Set up MCTS
-3. Explore repeated moves approach
+1. Add logic to game.rs to handle incremental moves
+2. Wrap up self-play simulation
 
 References
 - https://sebastianbodenstein.com/post/alphazero/
 - https://arxiv.org/pdf/1712.01815.pdf
+- https://arc.net/folder/7FE3479D-1752-401F-9DC3-49AAD02B5DF3

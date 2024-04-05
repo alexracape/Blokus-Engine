@@ -2,9 +2,8 @@
 syntax = "proto3";
 package blokusmodel;
 
-message State {
-    repeated bool board = 1;
-    repeated bool pieces = 2;
+message StateRepresentation {
+    repeated bool boards = 1;
     int32 player = 3;
 }
 
@@ -14,8 +13,9 @@ message Prediction {
 }
 
 message Data {
-    repeated State states = 1;
-    repeated Prediction predictions = 2;
+    repeated StateRepresentation states = 1;
+    repeated float policies = 2;
+    repeated float values = 3;
 }
 
 message Status {
@@ -23,6 +23,6 @@ message Status {
 }
 
 service BlokusModel {
-    rpc Predict(State) returns (Prediction) {}
+    rpc Predict(StateRepresentation) returns (Prediction) {}
     rpc Train(Data) returns (Status) {}
 }

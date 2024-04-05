@@ -16,20 +16,27 @@ class BlokusModel(torch.nn.Module):
     def __init__(self):
         super(BlokusModel, self).__init__()
 
-        self.conv1 = Conv2d(4, 64, kernel_size=5, stride=1, padding=2)
+        self.conv1 = Conv2d(5, 64, kernel_size=5, stride=1, padding=2)
         self.conv2 = Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
         self.conv3 = Conv2d(128, 1, kernel_size=3, stride=1, padding=1)
 
         self.fc1 = Linear(20*20, 512)
         self.fc2 = Linear(512, 256)
 
-        self.policy_head = Linear(256, 21)
+        self.policy_head = Linear(256, 400)
         self.value_head = Linear(256, 4)
         
         self.relu = ReLU()
 
-    def forward(self, board, pieces, player):
+    def forward(self, board, player):
+        """Get the policy and value for the given board state
         
+        For now, the board is represented by a 20x20x5 tensor where the first 4 channels are
+        binary boards for each player's pieces on the board. The 5th channel is a binary board
+        with the valid moves for the current player. For now, I'm just going to use the boards.
+        It is unclear why the player color is needed in the state.
+        """
+        # print(board.shape)
         x = self.relu(self.conv1(board))
         x = self.relu(self.conv2(x))
         x = self.relu(self.conv3(x))
@@ -40,6 +47,9 @@ class BlokusModel(torch.nn.Module):
 
         policy = self.policy_head(x)
         value = self.value_head(x)
+
+        mask = torch.tensor(board[4], dtype=torch.float32).flatten()
+        policy = policy * mask
 
         return policy, value
 
@@ -63,28 +73,27 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         else:
             self.model = BlokusModel().to(self.device)
 
-        summary(self.model, [(4, 20, 20), (1, 21, 4), (1, 1, 1)])
+        # summary(self.model, [(5, 20, 20), (1, 1, 1)]) # for some reason dimension when summarizing is (2, 5, 20, 20)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.01)
         self.loss = torch.nn.MSELoss().to(self.device)  # Might need to change to custom
 
     def Predict(self, request, context):
         
         print("Predicting...")
-        board = np.array(request.board).reshape(4, 20, 20)
-        pieces = np.array(request.pieces).reshape(4, 21)
+        boards = np.array(request.boards).reshape(5, 20, 20)
         player = request.player
 
-        board = torch.tensor(board, dtype=torch.float32).to(self.device)
+        boards = torch.tensor(boards, dtype=torch.float32).to(self.device)
 
         with torch.no_grad():
-            policy, values = self.model(board, pieces, player)
+            policy, values = self.model(boards, player)
         print(policy, values)
         return model_pb2.Prediction(policy=policy[0], value=values[0])
     
 
     def Train(self, request, context):
         loss = 0
-        return model_pb2.Status(value=loss)
+        return model_pb2.Status(code=0)
 
 
 def serve():
