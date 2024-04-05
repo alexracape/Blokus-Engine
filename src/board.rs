@@ -8,6 +8,7 @@ use crate::pieces::{Piece, PieceVariant, PIECE_TYPES};
 
 
 pub const BOARD_SIZE: usize = 20;
+const TOTAL_TILES: i32 = 89;
 const CORNERS_OFFSETS: [i32; 4] = [
     1 + BOARD_SIZE as i32,
     -1 - BOARD_SIZE as i32, 
@@ -131,6 +132,36 @@ impl Board {
 
     pub fn use_piece(&mut self, player: usize, piece: usize) {
         self.pieces[player].remove(piece);
+    }
+
+    pub fn get_scores(&self, last_piece_lens: [u32; 4]) -> Vec<i32> {
+
+        // Count the number of pieces on the board for each player
+        let mut scores = vec![0; 4];
+        for cell in self.board.iter() {
+            let player = *cell & 0b1111;
+            if player != 0{
+                scores[player as usize - 1] += 1;
+            }
+        }
+
+        // 15 bonus points for playing all pieces
+        for (i, pieces) in self.pieces.iter().enumerate() {
+
+            // Subtract to get the number of pieces remaining
+            scores[i] = scores[i] - TOTAL_TILES;
+
+            if pieces.len() == 0 {
+                scores[i] += 15;
+
+                // 5 bonus points for playing your smallest piece last
+                if last_piece_lens[i] == 1 {
+                    scores[i] += 5;
+                }
+            }
+        }
+
+        scores
     }
 
     pub fn print_board(&self) {
