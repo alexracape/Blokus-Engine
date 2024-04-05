@@ -1,6 +1,5 @@
 mod board;
 mod pieces;
-mod player;
 mod game;
 mod node;
 

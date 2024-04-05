@@ -10,7 +10,7 @@ fn main() {
     for _ in 0..SELF_PLAY_GAMES {
         let result = play_game(server_address.clone());
         match result {
-            Ok(_) => println!("Game played successfully"),
+            Ok(status) => println!("{}", status),
             Err(e) => println!("Error playing game: {:?}", e),
         }
     }

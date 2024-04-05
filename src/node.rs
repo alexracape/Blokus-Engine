@@ -12,7 +12,7 @@ pub struct Node {
     pub to_play: usize,
     pub value_sum: f32,
     pub visits: u32,
-    prior: f32,
+    pub prior: f32,
 }
 
 impl Node {
@@ -26,9 +26,18 @@ impl Node {
         }
     }   
 
-    /// Is the node a leaf
-    pub fn is_leaf(&self) -> bool {
-        self.children.len() == 0
+    /// Has the node been explored before
+    pub fn is_expanded(&self) -> bool {
+        self.children.len() > 0
+    }
+
+    /// Get the value of the node
+    pub fn value(&self) -> f32 {
+        if self.visits == 0 {
+            0.0
+        } else {
+            self.value_sum / self.visits as f32
+        }
     }
 
 }

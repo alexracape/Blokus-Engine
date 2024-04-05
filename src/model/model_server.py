@@ -81,7 +81,6 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         
         print("Predicting...")
         boards = np.array(request.boards).reshape(5, 20, 20)
-        print(boards.shape)
         player = request.player
 
         boards = torch.tensor(boards, dtype=torch.float32).to(self.device)
@@ -94,7 +93,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
 
     def Train(self, request, context):
         loss = 0
-        return model_pb2.Status(value=loss)
+        return model_pb2.Status(code=0)
 
 
 def serve():
