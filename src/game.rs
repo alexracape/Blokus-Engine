@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
+use std::iter::zip;
 use std::rc::Rc;
 
 use gloo_console as console;
@@ -8,7 +8,6 @@ use yew::prelude::*;
 use crate::grpc::StateRepresentation;
 use crate::board::Board;
 use crate::pieces::Piece;
-use crate::player::Player;
 
 const BOARD_SPACES: usize = 400;
 
@@ -21,10 +20,12 @@ pub enum Action {
 
 
 /// Get the legal moves for a piece
-fn get_piece_moves(piece: &Piece, board: &Board, player: &Player) -> Vec<Vec<usize>> {
+fn get_piece_moves(piece_i: usize, board: &Board, player: usize) -> (Vec<(usize, usize, usize)>, Vec<Vec<usize>>) {
     let mut moves = Vec::new();
-    for anchor in &player.get_anchors() {
-        for variant in &piece.variants {
+    let mut tile_groups = Vec::new();
+    let piece = &board.get_pieces(player)[piece_i];
+    for anchor in &board.get_anchors(player) {
+        for (var_i, variant) in piece.variants.iter().enumerate() {
             for offset in &variant.offsets {
 
                 // Check underflow
@@ -35,44 +36,47 @@ fn get_piece_moves(piece: &Piece, board: &Board, player: &Player) -> Vec<Vec<usi
                 let total_offset = anchor - offset; // offset to anchor, then offset to line up piece
                 if board.is_valid_move(player, variant, total_offset) {
                     let mut tiles = Vec::new();
-                    for (i, square) in variant.variant.iter().enumerate() {
+                    for (j, square) in variant.variant.iter().enumerate() {
                         if *square {
-                            tiles.push(total_offset + i);
+                            tiles.push(total_offset + j);
                         }
                     }
-                    moves.push(tiles);
+                    tile_groups.push((tiles));
+                    moves.push((piece_i, var_i, total_offset))
                 }
             }
         }
     }
 
-    moves
+    (moves, tile_groups)
 }
 
 
 /// Get the legal moves for a player, tile placements grouped by move
-fn get_moves(board: &Board, player: &Player) -> Vec<Vec<usize>> {
+fn get_moves(board: &Board, player: usize) -> (Vec<(usize, usize, usize)>, Vec<Vec<usize>>){
     let mut moves = Vec::new();
-    for piece in &player.pieces {
-        let piece_moves = get_piece_moves(piece, board, player);
+    let mut tile_groups = Vec::new();
+    for piece in 0..board.get_pieces(player).len() {
+        let (piece_moves, piece_tiles) = get_piece_moves(piece, board, player);
         moves.extend(piece_moves);
+        tile_groups.extend(piece_tiles);
     }
 
-    moves
+    (moves, tile_groups)
 }
 
 
 /// Get the tile bases representation for legal moves
-fn get_tile_moves(board: &Board, player: &Player) -> HashMap<usize, HashSet<usize>> {
+fn get_tile_moves(board: &Board, player: usize, ) -> HashMap<usize, HashSet<(usize, usize, usize)>> {
     let mut tile_rep = HashMap::new();
-    let mut moves = get_moves(board, player);
+    let (moves, tile_groups) = get_moves(board, player);
     
-    for (i, tiles) in moves.iter().enumerate() {
+    for (id, tiles) in zip(moves, tile_groups) {
         for tile in tiles {
-            if !tile_rep.contains_key(tile) {
-                tile_rep.insert(*tile, HashSet::new());
+            if !tile_rep.contains_key(&tile) {
+                tile_rep.insert(tile, HashSet::new());
             }
-            tile_rep.get_mut(tile).unwrap().insert(i);
+            tile_rep.get_mut(&tile).unwrap().insert(id);
         }
     }
 
@@ -83,10 +87,10 @@ fn get_tile_moves(board: &Board, player: &Player) -> HashMap<usize, HashSet<usiz
 #[derive(Clone)]
 pub struct Game {
     pub board: Board,
-    players: Vec<Player>,
     history: Vec<Vec<usize>>, // each row is a move consisting of its tiles
-    current_player: usize,  // index of current player in players
-    legal_tiles: HashMap<usize, HashSet<usize>> // Map tile to index of the overall move
+    players_remaining: Vec<usize>, // indices of players still in the game
+    player_index: usize, // index of the current player in players_remaining
+    legal_tiles: HashMap<usize, HashSet<(usize, usize, usize)>> // Map tile to index of the overall move
 }
 
 impl Reducible for Game {
@@ -95,56 +99,45 @@ impl Reducible for Game {
     fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
         match action {
             Action::PlacePiece(p, v, o) => {
+                let player = self.current_player();
                 let mut new_state = (*self).clone();
-                let player = &mut new_state.players[self.current_player];
-                console::log!(
-                    "Anchors",
-                    player
-                        .get_anchors()
-                        .iter()
-                        .map(|a| a.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                );
-                let piece = player.pieces[p].variants[v].clone();
+                let piece = self.board.get_pieces(player)[p].variants[v].clone();
 
                 // Check if move is valid
-                if !new_state.board.is_valid_move(&player, &piece, o) {
+                if !new_state.board.is_valid_move(player, &piece, o) {
                     console::log!("Invalid move");
                     return self.into();
                 }
 
                 // Remove piece from player and place piece
-                player.pieces.remove(p);
-                let used_spaces = new_state.board.place_piece(player, &piece, o);
-                new_state.current_player = self.next_player();
+                // player.pieces.remove(p);
+                // let used_spaces = new_state.board.place_piece(player, &piece, o);
+                // new_state.current_player = self.next_player();
 
-                // Update anchors for all players
-                for player in &mut new_state.players {
-                    player.use_anchors(&used_spaces);
-                }
+                // // Update anchors for all players
+                // for player in &mut new_state.players {
+                //     player.use_anchors(&used_spaces);
+                // }
 
-                // Add move to stack
-                new_state.history.push(used_spaces.into_iter().collect());
+                // // Add move to stack
+                // new_state.history.push(used_spaces.into_iter().collect());
 
-                // Return new state
+                // // Return new state
                 new_state.into()
             }
             Action::Pass => {
                 let mut new_state = (*self).clone();
-                new_state.players.remove(self.current_player);
+                new_state.eliminate_player();
 
                 if new_state.is_terminal() {
                     return Game::reset().into(); // TODO - need to handle better with message or something
                 }
 
-                new_state.current_player = self.current_player % new_state.players.len();
                 new_state.into()
             }
             Action::Undo => {
                 let mut new_state = (*self).clone();
                 let last_move = new_state.history.pop().unwrap();
-                let player = &new_state.players[self.current_player];
                 // TODO: Need to implement undo
                 new_state.into()
             }
@@ -155,59 +148,84 @@ impl Reducible for Game {
 
 impl Game {
     pub fn reset() -> Self {
-        let mut players = Vec::new();
-        for i in 1..5 {
-            players.push(Player::new(i));
-        }
+        let board = Board::new();
+        let legal_tiles = get_tile_moves(&board, 0);
+
         Game {
-            board: Board::new(),
-            players,
+            board: board,
             history: Vec::new(),
-            current_player: 0,
-            legal_tiles: HashMap::new(),
+            players_remaining: vec![0, 1, 2, 3],
+            player_index: 0,
+            legal_tiles: legal_tiles,
         }
     }
 
-    pub fn apply(&mut self, tile: usize) -> () {
+    pub fn apply(&mut self, tile: usize) -> Result<(), String> {
 
         // Place piece on board
-        self.board.place_tile(tile, self.current_player as u8);
+        self.board.place_tile(tile, self.current_player());
 
         // Update legal tiles
-        let valid_moves = self.legal_tiles.remove(&tile).unwrap();
+        // let valid_moves = self.legal_tiles.remove(&tile).unwrap();
+        let valid_moves = match self.legal_tiles.remove(&tile) {
+            Some(moves) => moves,
+            None => return Err("Invalid move".to_string())
+        };
         for (tile, move_set) in self.legal_tiles.clone() {
-            move_set.iter().filter(|m| !valid_moves.contains(m));
-            if move_set.len() < 1 {
+            self.legal_tiles.insert(tile, move_set.intersection(&valid_moves).map(|m| *m).collect());
+            if self.legal_tiles.get(&tile).unwrap().len() == 0 {
                 self.legal_tiles.remove(&tile);
             }
         }
 
         // Advance to next player if necessary
-        while self.legal_tiles.len() == 0 && !self.is_terminal(){
-            self.current_player = self.next_player();
-            self.legal_tiles = get_tile_moves(&self.board, &self.players[self.current_player]);
+        if self.legal_tiles.len() == 0 {
+
+            // Removing the player's piece
+            let (piece, _variant, _offset) = valid_moves.iter().next().unwrap();
+            self.board.use_piece(self.current_player(), *piece);
+
+            // Advance to next player
+            let next = self.next_player();
+            self.legal_tiles = get_tile_moves(&self.board, next);
+            if self.legal_tiles.len() == 0 {
+                self.eliminate_player();
+            }
         }
 
+        Ok(())
     }
 
     pub fn get_board(&self) -> &[u8; BOARD_SPACES] {
         &self.board.board
     }
 
-    pub fn next_player(&self) -> usize {
-        (self.current_player + 1) % self.players.len()
+    pub fn next_player(&mut self) -> usize {
+        self.player_index = (self.player_index + 1) % self.players_remaining.len();
+        self.players_remaining[self.player_index]
     }
 
     pub fn current_player(&self) -> usize {
-        self.current_player
+        self.players_remaining[self.player_index]
+    }
+
+    /// Remove the current player from the game
+    pub fn eliminate_player(&mut self) {
+        self.players_remaining.remove(self.player_index);
+        if self.players_remaining.len() == 0 {
+            return;
+        }
+
+        self.player_index = self.player_index % self.players_remaining.len();
+        self.legal_tiles = get_tile_moves(&self.board, self.current_player());
     }
 
     pub fn get_current_player_pieces(&self) -> Vec<Piece> {
-        self.players[self.current_player].pieces.clone()
+        self.board.get_pieces(self.current_player())
     }
 
     pub fn get_current_anchors(&self) -> HashSet<usize> {
-        self.players[self.current_player].get_anchors()
+        self.board.get_anchors(self.current_player())
     }
 
     pub fn legal_tiles(&self) -> Vec<usize> {
@@ -219,7 +237,7 @@ impl Game {
     }
 
     pub fn is_terminal(&self) -> bool {
-        self.players.len() == 0
+        self.players_remaining.len() == 1 || self.legal_tiles.len() == 0
     }
 
     /// Get a representation of the state for the neural network
