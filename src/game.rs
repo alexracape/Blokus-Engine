@@ -187,6 +187,8 @@ impl Game {
             let (piece, _variant, _offset) = valid_moves.iter().next().unwrap();
             self.last_piece_lens[self.current_player()] = self.board.get_pieces(self.current_player()).remove(*piece).points;
             self.board.use_piece(self.current_player(), *piece);
+            self.board.print_board();
+            println!();
 
             // Advance to next player
             let next = self.next_player();

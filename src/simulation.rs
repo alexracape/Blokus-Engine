@@ -11,7 +11,8 @@ use crate::node::Node;
 use crate::game::Game;
 
 
-const SIMULATIONS: usize = 1;
+const SIMULATIONS: usize = 5;
+const SAMPLE_MOVES: usize = 30;
 const C_BASE: f32 = 19652.0;
 const C_INIT: f32 = 1.25;
 
@@ -57,6 +58,24 @@ fn ucb_score(parent: &Node, child: &Node) -> f32 {
     prior_score + value_score
 }
 
+
+/// Sample from a softmax distribution
+/// Used to select actions during the first few moves to encourage exploration
+fn softmax_sample(visit_dist: Vec<(usize, u32)>) -> usize {
+    let total_visits: u32 = visit_dist.iter().fold(0, |acc, (_, visits)| acc + visits);
+    let sample = rand::thread_rng().gen_range(0.0..1.0);
+    let mut sum = 0.0;
+
+    for (tile, visits) in &visit_dist {
+        sum += (*visits as f32) / (total_visits as f32);
+        if sum > sample {
+            return *tile;
+        }
+    }
+    visit_dist.last().unwrap().0
+}
+
+
 /// Select child node to explore
 /// Uses UCB formula to balance exploration and exploitation
 /// Returns the action and the child node's key
@@ -75,29 +94,23 @@ fn select_child(node: &Node) -> usize {
 
 
 /// Select action from policy
-fn select_action(policy: Vec<f32>) -> usize {
-    let mut rng = rand::thread_rng();
-    let mut action = 0;
-    let mut best_prob = 0.0;
-    let mut total_prob = 0.0;
-    for (i, prob) in policy.iter().enumerate() {
-        total_prob += prob;
-        let random = rng.gen_range(0.0..1.0);
-        if random < total_prob {
-            action = i;
-            break;
-        }
+fn select_action(root: &Node, num_moves: usize) -> usize {
+    let visit_dist: Vec<(usize, u32)> = root.children.iter().map(|(tile, node)| (*tile, node.visits)).collect();
+    if num_moves < SAMPLE_MOVES {
+        softmax_sample(visit_dist)
+    } else {
+        visit_dist.iter().max_by(|a, b| a.1.cmp(&b.1)).unwrap().0
     }
-    action
+
 }
 
 
 /// Update node when visitied during backpropagation
 fn backpropagate(search_path: Vec<usize>, root: &mut Node, values: Vec<f32>) -> () {
 
-    let node = root;
+    let mut node = root;
     for tile in search_path {
-        let node = node.children.get_mut(&tile).unwrap();
+        node = node.children.get_mut(&tile).unwrap();
         node.visits += 1;
         node.value_sum += values[node.to_play];
     }
@@ -105,7 +118,7 @@ fn backpropagate(search_path: Vec<usize>, root: &mut Node, values: Vec<f32>) -> 
 
 
 /// Run MCTS simulations to get policy for root node
-async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>) -> Result<Vec<f32>, Box<dyn std::error::Error>>{
+async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mut Vec<Vec<f32>>) -> Result<usize, Box<dyn std::error::Error>>{
     
     // Initialize root for these sims, evaluate it, and add children
     let mut root = Node::new(0.0);
@@ -114,7 +127,6 @@ async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>) -> Result<Vec
         Err(e) => {
             println!("Error evaluating root node: {:?}", e);
             return Err(e);
-        
         }
     }
     // TODO: Add noise to tree
@@ -139,15 +151,17 @@ async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>) -> Result<Vec
         backpropagate(search_path, &mut root, values) // Pass reference to node
     }
 
-    // Return the policy for the root node
+    // Save policy for this state
     let total_visits: u32 = root.children.iter().map(|(tile, child)| child.visits).sum();
     let mut policy = vec![0.0; 400];
-    for (tile, node) in root.children {
-        policy[tile] = node.visits as f32 / total_visits as f32;
+    for (tile, node) in &root.children {
+        policy[*tile] = node.visits as f32 / total_visits as f32;
     }
-    Ok(policy)
-    
+    policies.push(policy);
 
+    // Pick action to take
+    let action = select_action(&root, policies.len());
+    Ok(action)
 }
 
 
@@ -160,28 +174,22 @@ pub async fn play_game(server_address: String) -> Result<String, Box<dyn std::er
     // Run self-play to generate data
     let mut game = Game::reset();
     let mut states = Vec::new();
-    let mut policies = Vec::new();
+    let mut policies: Vec<Vec<f32>> = Vec::new();
     while !game.is_terminal() {
 
         // Get MCTS policy for current state
         // let mut policy = mcts(&game, &mut model).await?;
-        let policy = match mcts(&game, &mut model).await {
-            Ok(p) => p,
+        states.push(game.get_representation());
+        let action = match mcts(&game, &mut model, &mut policies).await {
+            Ok(a) => a,
             Err(e) => {
                 println!("Error running MCTS: {:?}", e);
                 return Err(e);
             }
         };
-
-        policies.push(policy.clone());
-        states.push(game.get_representation());
-
-
-        // Pick action from policy and continue self-play
-        let action = select_action(policy);
-        println!("Player {} --- {}", game.current_player(), action);
+        
+        // println!("Player {} --- {}", game.current_player(), action);
         game.apply(action);
-        game.board.print_board();
 
     }
 
@@ -192,7 +200,8 @@ pub async fn play_game(server_address: String) -> Result<String, Box<dyn std::er
         values: game.get_payoff(),
     });
     model.train(data).await?;
-
+    
+    // game.board.print_board();
     Ok(format!("Game finished with payoff: {:?}", game.get_payoff()))
 }
 

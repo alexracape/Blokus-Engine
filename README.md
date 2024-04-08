@@ -22,15 +22,18 @@ On Tap:
     - I could try to disable these modules for wasm build, but then I won't be able to use the 
     GUI to connect to the model. Maybe I could use another library later for that
 - Handle game over in gui instead of just resetting (state.rs)
-- Refactor player to disentangle functions for moves and game state - is player struct really necessary?
 - Piece variants seem like a mess, is it worth refactoring?
     - I made it thinking about the bit boards, but now there are also a lot of shape applications
 - Add noise to the MCTS
 - Update the way moves are applied for GUI
+- Look into docker and kubernetes for deployment
 
 Plan:
-1. Add logic to game.rs to handle incremental moves
-2. Wrap up self-play simulation
+1. Fix issue with multiple simulations - look into issues with tree maybe?
+2. Implement noise in MCTS
+3. Fix GUI
+4. Implement undo
+5. Look into deployment
 
 References
 - https://sebastianbodenstein.com/post/alphazero/
