@@ -29,11 +29,10 @@ On Tap:
 - Look into docker and kubernetes for deployment
 
 Plan:
-1. Fix issue with multiple simulations - look into issues with tree maybe?
-2. Implement noise in MCTS
-3. Fix GUI
-4. Implement undo
-5. Look into deployment
+1. Add training capability in model
+2. Fix GUI
+3. Implement undo
+4. Look into deployment
 
 References
 - https://sebastianbodenstein.com/post/alphazero/

@@ -1,5 +1,6 @@
 // One game of self-play using MCTS and a neural network
 use rand::Rng;
+use rand_distr::{Dirichlet, Distribution};
 use std::vec;
 
 use crate::grpc::blokus_model_client::BlokusModelClient;
@@ -13,8 +14,15 @@ use crate::game::Game;
 
 const SIMULATIONS: usize = 5;
 const SAMPLE_MOVES: usize = 30;
+
+// Constants for UCB formula
 const C_BASE: f32 = 19652.0;
 const C_INIT: f32 = 1.25;
+
+// Constants for exploration noise
+const DIRICHLET_ALPHA: f32 = 0.3;
+const EXPLORATION_FRACTION: f32 = 0.25;
+
 
 
 /// Evaluate and Expand the Node
@@ -57,6 +65,24 @@ fn ucb_score(parent: &Node, child: &Node) -> f32 {
     let value_score = child.value();
     prior_score + value_score
 }
+
+
+/// Add noise to the root node to encourage exploration
+fn add_exploration_noise(root: &mut Node) -> () {
+    let num_actions = root.children.len();
+    if num_actions <= 1 {
+        return;
+    }
+
+    let alpha_vec = vec![DIRICHLET_ALPHA; num_actions];
+    let dirichlet = Dirichlet::new(&alpha_vec).unwrap();
+    let noise = dirichlet.sample(&mut rand::thread_rng());
+    for (i, (_tile, node)) in root.children.iter_mut().enumerate() {
+        node.prior = node.prior * (1.0 - EXPLORATION_FRACTION) + noise[i] * EXPLORATION_FRACTION;
+    }
+
+}
+
 
 
 /// Sample from a softmax distribution
@@ -129,7 +155,7 @@ async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mu
             return Err(e);
         }
     }
-    // TODO: Add noise to tree
+    add_exploration_noise(&mut root);
 
     for _ in 0..SIMULATIONS {
 
