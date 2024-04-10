@@ -11,7 +11,10 @@ fn main() {
         let result = play_game(server_address.clone());
         match result {
             Ok(status) => println!("{}", status),
-            Err(e) => println!("Error playing game: {:?}", e),
+            Err(e) => {
+                println!("Error playing game: {:?}", e);
+                break;
+            }
         }
     }
 }

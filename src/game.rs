@@ -100,7 +100,7 @@ impl Reducible for Game {
     fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
         match action {
             Action::PlacePiece(p, v, o) => {
-                let player = self.current_player();
+                let player = self.current_player().expect("No current player");
                 let mut new_state = (*self).clone();
                 let piece = self.board.get_pieces(player)[p].variants[v].clone();
 
@@ -165,7 +165,11 @@ impl Game {
     pub fn apply(&mut self, tile: usize) -> Result<(), String> {
 
         // Place piece on board
-        self.board.place_tile(tile, self.current_player());
+        let current_player = match self.current_player() {
+            Some(p) => p,
+            None => return Err("No current player".to_string())
+        };
+        self.board.place_tile(tile, current_player);
 
         // Update legal tiles
         // let valid_moves = self.legal_tiles.remove(&tile).unwrap();
@@ -185,8 +189,8 @@ impl Game {
 
             // Removing the player's piece
             let (piece, _variant, _offset) = valid_moves.iter().next().unwrap();
-            self.last_piece_lens[self.current_player()] = self.board.get_pieces(self.current_player()).remove(*piece).points;
-            self.board.use_piece(self.current_player(), *piece);
+            self.last_piece_lens[current_player] = self.board.get_pieces(current_player).remove(*piece).points;
+            self.board.use_piece(current_player, *piece);
             self.board.print_board();
             println!();
 
@@ -210,8 +214,8 @@ impl Game {
         self.players_remaining[self.player_index]
     }
 
-    pub fn current_player(&self) -> usize {
-        self.players_remaining[self.player_index]
+    pub fn current_player(&self) -> Option<usize> {
+        self.players_remaining.get(self.player_index).copied()
     }
 
     /// Remove the current player from the game
@@ -222,15 +226,17 @@ impl Game {
         }
 
         self.player_index = self.player_index % self.players_remaining.len();
-        self.legal_tiles = get_tile_moves(&self.board, self.current_player());
+        self.legal_tiles = get_tile_moves(&self.board, self.current_player().expect("No current player"));
     }
 
     pub fn get_current_player_pieces(&self) -> Vec<Piece> {
-        self.board.get_pieces(self.current_player())
+        let current_player = self.current_player().expect("No current player");
+        self.board.get_pieces(current_player)
     }
 
     pub fn get_current_anchors(&self) -> HashSet<usize> {
-        self.board.get_anchors(self.current_player())
+        let current_player = self.current_player().expect("No current player");
+        self.board.get_anchors(current_player)
     }
 
     pub fn legal_tiles(&self) -> Vec<usize> {
@@ -267,15 +273,18 @@ impl Game {
 
     /// Get a representation of the state for the neural network
     /// This representation includes the board and the legal tiles
+    /// Oriented to the current player
     pub fn get_representation(&self) -> StateRepresentation {
 
         // Get rep for the pieces on the board
+        let current_player = self.current_player().expect("No current player");
         let board = &self.board.board;
         let mut board_rep = [[false; BOARD_SPACES]; 5];
         for i in 0..BOARD_SPACES {
-            let player = board[i] & 0b1111; // check if there is a player piece
+            let player = (board[i] & 0b1111) as usize; // check if there is a player piece
+            let player_board = (4 + player - current_player) % 4; // orient to current player (0 indexed)
             if player != 0 {
-                board_rep[player as usize - 1][i] = true;
+                board_rep[player_board][i] = true;
             }
         }
 
@@ -287,7 +296,7 @@ impl Game {
 
         StateRepresentation {
             boards: board_rep.into_iter().flat_map(|inner| inner).collect(),
-            player: self.current_player() as i32,
+            player: current_player as i32,
         }
 
     }

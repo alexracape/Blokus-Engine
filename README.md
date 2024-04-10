@@ -24,7 +24,6 @@ On Tap:
 - Handle game over in gui instead of just resetting (state.rs)
 - Piece variants seem like a mess, is it worth refactoring?
     - I made it thinking about the bit boards, but now there are also a lot of shape applications
-- Add noise to the MCTS
 - Update the way moves are applied for GUI
 - Look into docker and kubernetes for deployment
 
