@@ -12,7 +12,7 @@ use crate::node::Node;
 use crate::game::Game;
 
 
-const SIMULATIONS: usize = 5;
+const SIMULATIONS: usize = 1;
 const SAMPLE_MOVES: usize = 30;
 
 // Constants for UCB formula
@@ -41,13 +41,13 @@ async fn evaluate(node: &mut Node, game: &Game, model: &mut BlokusModelClient<Ch
         if legal_moves[i] {
             Some((i, logit.exp()))
         } else {
-            None 
+            None
         }
     }).collect();
     let total: f32 = exp_policy.iter().map(|(_, p)| p).sum();
     
     // Expand the node with the policy
-    node.to_play = game.current_player();
+    node.to_play = game.current_player().unwrap();
     for (tile, prob) in exp_policy {
         node.children.insert(tile, Node::new(prob / total));
     }

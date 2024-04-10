@@ -78,21 +78,29 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         self.loss = torch.nn.MSELoss().to(self.device)  # Might need to change to custom
 
     def Predict(self, request, context):
-        
-        print("Predicting...")
         boards = np.array(request.boards).reshape(5, 20, 20)
-        player = request.player
-
         boards = torch.tensor(boards, dtype=torch.float32).to(self.device)
+        player = request.player
 
         with torch.no_grad():
             policy, values = self.model(boards, player)
-        print(policy, values)
+        print(values)
         return model_pb2.Prediction(policy=policy[0], value=values[0])
     
 
     def Train(self, request, context):
         loss = 0
+
+        # Get the states and convert them to tensors - Look into buffer / batching
+        request_states = np.array(request.states) # 250+ moves
+        states = torch.zeros((len(request_states), 5, 20, 20), dtype=torch.bool)
+        for i, state in enumerate(request_states):
+            states[i] = torch.tensor(state, dtype=torch.bool)
+        states = states.to(self.device)
+
+        policies = np.array(request.policies).reshape(-1, 400)
+        values = np.array(request.values)
+        print(states.shape)
         return model_pb2.Status(code=0)
 
 
