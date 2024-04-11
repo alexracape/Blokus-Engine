@@ -1,7 +1,7 @@
 use blokus_backend::simulation::play_game;
 
 
-const SELF_PLAY_GAMES: usize = 1;
+const SELF_PLAY_GAMES: usize = 1; // 21 million for Go in AlphaZero
 
 
 fn main() {

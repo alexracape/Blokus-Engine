@@ -87,7 +87,7 @@ fn get_tile_moves(board: &Board, player: usize, ) -> HashMap<usize, HashSet<(usi
 #[derive(Clone)]
 pub struct Game {
     pub board: Board,
-    history: Vec<Vec<usize>>, // Each row is a move consisting of its tiles
+    pub history: Vec<(i32, i32)>, // Stack of moves
     players_remaining: Vec<usize>, // Indices of players still in the game
     player_index: usize, // Index of the current player in players_remaining
     legal_tiles: HashMap<usize, HashSet<(usize, usize, usize)>>, // Map tile to index of the overall move
@@ -138,7 +138,6 @@ impl Reducible for Game {
             }
             Action::Undo => {
                 let mut new_state = (*self).clone();
-                let last_move = new_state.history.pop().unwrap();
                 // TODO: Need to implement undo
                 new_state.into()
             }
@@ -170,9 +169,9 @@ impl Game {
             None => return Err("No current player".to_string())
         };
         self.board.place_tile(tile, current_player);
+        self.history.push((current_player as i32, tile as i32));
 
         // Update legal tiles
-        // let valid_moves = self.legal_tiles.remove(&tile).unwrap();
         let valid_moves = match self.legal_tiles.remove(&tile) {
             Some(moves) => moves,
             None => return Err("Invalid move".to_string())
