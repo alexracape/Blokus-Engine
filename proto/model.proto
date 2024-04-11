@@ -7,14 +7,28 @@ message StateRepresentation {
     int32 player = 3;
 }
 
-message Prediction {
+message Target {
     repeated float policy = 1;
     repeated float value = 2;
 }
 
-message Data {
-    repeated StateRepresentation states = 1;
-    repeated float policies = 2;
+message Move {
+    int32 player = 1;
+    int32 tile = 2;
+}
+
+message ActionProb {
+    int32 action = 1;
+    float prob = 2;
+}
+
+message Policy {
+    repeated ActionProb probs = 1;
+}
+
+message Game {
+    repeated Move history = 1;
+    repeated Policy policies = 2;
     repeated float values = 3;
 }
 
@@ -23,6 +37,6 @@ message Status {
 }
 
 service BlokusModel {
-    rpc Predict(StateRepresentation) returns (Prediction) {}
-    rpc Train(Data) returns (Status) {}
+    rpc Predict(StateRepresentation) returns (Target) {}
+    rpc Save(Game) returns (Status) {}
 }

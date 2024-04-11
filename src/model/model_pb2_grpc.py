@@ -17,11 +17,11 @@ class BlokusModelStub(object):
         self.Predict = channel.unary_unary(
                 '/blokusmodel.BlokusModel/Predict',
                 request_serializer=model__pb2.StateRepresentation.SerializeToString,
-                response_deserializer=model__pb2.Prediction.FromString,
+                response_deserializer=model__pb2.Target.FromString,
                 )
-        self.Train = channel.unary_unary(
-                '/blokusmodel.BlokusModel/Train',
-                request_serializer=model__pb2.Data.SerializeToString,
+        self.Save = channel.unary_unary(
+                '/blokusmodel.BlokusModel/Save',
+                request_serializer=model__pb2.Game.SerializeToString,
                 response_deserializer=model__pb2.Status.FromString,
                 )
 
@@ -35,7 +35,7 @@ class BlokusModelServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def Train(self, request, context):
+    def Save(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -47,11 +47,11 @@ def add_BlokusModelServicer_to_server(servicer, server):
             'Predict': grpc.unary_unary_rpc_method_handler(
                     servicer.Predict,
                     request_deserializer=model__pb2.StateRepresentation.FromString,
-                    response_serializer=model__pb2.Prediction.SerializeToString,
+                    response_serializer=model__pb2.Target.SerializeToString,
             ),
-            'Train': grpc.unary_unary_rpc_method_handler(
-                    servicer.Train,
-                    request_deserializer=model__pb2.Data.FromString,
+            'Save': grpc.unary_unary_rpc_method_handler(
+                    servicer.Save,
+                    request_deserializer=model__pb2.Game.FromString,
                     response_serializer=model__pb2.Status.SerializeToString,
             ),
     }
@@ -77,12 +77,12 @@ class BlokusModel(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/blokusmodel.BlokusModel/Predict',
             model__pb2.StateRepresentation.SerializeToString,
-            model__pb2.Prediction.FromString,
+            model__pb2.Target.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def Train(request,
+    def Save(request,
             target,
             options=(),
             channel_credentials=None,
@@ -92,8 +92,8 @@ class BlokusModel(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/blokusmodel.BlokusModel/Train',
-            model__pb2.Data.SerializeToString,
+        return grpc.experimental.unary_unary(request, target, '/blokusmodel.BlokusModel/Save',
+            model__pb2.Game.SerializeToString,
             model__pb2.Status.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

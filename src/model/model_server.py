@@ -28,7 +28,7 @@ class BlokusModel(torch.nn.Module):
         
         self.relu = ReLU()
 
-    def forward(self, board, player):
+    def forward(self, boards):
         """Get the policy and value for the given board state
         
         For now, the board is represented by a 20x20x5 tensor where the first 4 channels are
@@ -37,7 +37,7 @@ class BlokusModel(torch.nn.Module):
         It is unclear why the player color is needed in the state.
         """
         # print(board.shape)
-        x = self.relu(self.conv1(board))
+        x = self.relu(self.conv1(boards))
         x = self.relu(self.conv2(x))
         x = self.relu(self.conv3(x))
 
@@ -48,7 +48,10 @@ class BlokusModel(torch.nn.Module):
         policy = self.policy_head(x)
         value = self.value_head(x)
 
-        mask = torch.tensor(board[4], dtype=torch.float32).flatten()
+        if len(boards.shape) == 3:
+            mask = boards[4].flatten()
+        else:
+            mask = boards[:, 4, :, :].view(boards.size(0), -1)
         policy = policy * mask
 
         return policy, value
@@ -68,6 +71,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
     def __init__(self, model_path=None):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.buffer = ReplayBuffer()
         if model_path:
             self.model = torch.load(model_path, map_location=self.device)
         else:
@@ -83,25 +87,88 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         player = request.player
 
         with torch.no_grad():
-            policy, values = self.model(boards, player)
+            policy, values = self.model(boards)
         print(values)
-        return model_pb2.Prediction(policy=policy[0], value=values[0])
+        return model_pb2.Target(policy=policy[0], value=values[0])
     
 
-    def Train(self, request, context):
-        loss = 0
+    def Save(self, request, context):
+        """Store data in the replay buffer"""
 
-        # Get the states and convert them to tensors - Look into buffer / batching
-        request_states = np.array(request.states) # 250+ moves
-        states = torch.zeros((len(request_states), 5, 20, 20), dtype=torch.bool)
-        for i, state in enumerate(request_states):
-            states[i] = torch.tensor(state, dtype=torch.bool)
-        states = states.to(self.device)
-
-        policies = np.array(request.policies).reshape(-1, 400)
-        values = np.array(request.values)
-        print(states.shape)
+        self.buffer.add(request.history, request.policies, request.values)
+        print("Buffer size: ", len(self.buffer.buffer))
+        self.Train()
         return model_pb2.Status(code=0)
+    
+
+    def Train(self, batch_size=256, training_steps=10):
+        """Train the model using the data in the replay buffer"""
+
+        for _ in range(training_steps):
+            print("Training step: ", _)
+
+            # Get a batch of data from the replay buffer
+            batch = self.buffer.sample(batch_size)
+            inputs, policies, values = zip(*batch)
+            inputs = torch.stack(inputs).to(self.device)
+            policies = torch.stack(policies).to(self.device)
+            values = torch.stack(values).to(self.device)
+
+            # Train the model
+            self.optimizer.zero_grad()
+            policy, value = self.model(inputs)
+            policy_loss = self.loss(policy, policies)
+            value_loss = self.loss(value, values)
+            loss = policy_loss + value_loss
+            loss.backward()
+            self.optimizer.step()
+
+        return model_pb2.Status(code=0)
+    
+
+class ReplayBuffer:
+    """Buffer for storing game states for training the model"""
+
+    def __init__(self, capacity=1000):
+        self.capacity = capacity
+        self.buffer = []
+        self.total_moves = 0
+
+    def add(self, history, policies, values):
+        if len(self.buffer) >= self.capacity:
+            old = self.buffer.pop(0)
+            self.total_moves -= len(old[0])
+        self.buffer.append((history, policies, values))
+        self.total_moves += len(history)
+
+    def sample(self, batch_size):
+        weights = [len(game[0]) / self.total_moves for game in self.buffer]
+        games = np.random.choice(len(self.buffer), batch_size, p=weights)
+        return [self.training_data(self.buffer[i]) for i in games]
+    
+    def training_data(self, game):
+
+        # Get random move from the game
+        i = np.random.randint(len(game[0]))
+
+        # Get key data from the game
+        history, policies, values = game
+        state = torch.zeros(5, 20, 20, dtype=torch.float32)
+        policy = torch.zeros(400, dtype=torch.float32)
+        values = torch.tensor(values, dtype=torch.float32)
+
+        # Reconstruct state representation
+        for j in range(i):
+            player, tile = history[j].player, history[j].tile
+            row, col = tile // 20, tile % 20
+            state[player, row, col] = True
+
+        # reconstruct policy representation
+        for action in policies[i].probs:
+            tile, prob = action.action, action.prob
+            policy[tile] = prob
+
+        return state, policy, values
 
 
 def serve():

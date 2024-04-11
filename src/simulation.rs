@@ -4,7 +4,10 @@ use rand_distr::{Dirichlet, Distribution};
 use std::vec;
 
 use crate::grpc::blokus_model_client::BlokusModelClient;
-use crate::grpc::Data as DataRep;
+use crate::grpc::ActionProb;
+use crate::grpc::Game as GameRep;
+use crate::grpc::Policy;
+use crate::grpc::Move;
 
 use tonic::transport::Channel;
 
@@ -12,7 +15,7 @@ use crate::node::Node;
 use crate::game::Game;
 
 
-const SIMULATIONS: usize = 1;
+const SIMULATIONS: usize = 1; // 800 in AlphaZero
 const SAMPLE_MOVES: usize = 30;
 
 // Constants for UCB formula
@@ -20,7 +23,7 @@ const C_BASE: f32 = 19652.0;
 const C_INIT: f32 = 1.25;
 
 // Constants for exploration noise
-const DIRICHLET_ALPHA: f32 = 0.3;
+const DIRICHLET_ALPHA: f32 = 0.3; // Scaled for number of moves iin average game - revisit?
 const EXPLORATION_FRACTION: f32 = 0.25;
 
 
@@ -144,7 +147,7 @@ fn backpropagate(search_path: Vec<usize>, root: &mut Node, values: Vec<f32>) -> 
 
 
 /// Run MCTS simulations to get policy for root node
-async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mut Vec<Vec<f32>>) -> Result<usize, Box<dyn std::error::Error>>{
+async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mut Vec<Policy>) -> Result<usize, Box<dyn std::error::Error>>{
     
     // Initialize root for these sims, evaluate it, and add children
     let mut root = Node::new(0.0);
@@ -178,12 +181,12 @@ async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mu
     }
 
     // Save policy for this state
-    let total_visits: u32 = root.children.iter().map(|(tile, child)| child.visits).sum();
-    let mut policy = vec![0.0; 400];
-    for (tile, node) in &root.children {
-        policy[*tile] = node.visits as f32 / total_visits as f32;
-    }
-    policies.push(policy);
+    let total_visits: u32 = root.children.iter().map(|(_tile, child)| child.visits).sum();
+    let probs = root.children.iter().map(|(tile, child)| {
+        let p = (child.visits as f32) / (total_visits as f32);
+        ActionProb {action: *tile as i32, prob: p}
+    }).collect();
+    policies.push(Policy {probs: probs});
 
     // Pick action to take
     let action = select_action(&root, policies.len());
@@ -200,7 +203,7 @@ pub async fn play_game(server_address: String) -> Result<String, Box<dyn std::er
     // Run self-play to generate data
     let mut game = Game::reset();
     let mut states = Vec::new();
-    let mut policies: Vec<Vec<f32>> = Vec::new();
+    let mut policies: Vec<Policy> = Vec::new();
     while !game.is_terminal() {
 
         // Get MCTS policy for current state
@@ -216,16 +219,15 @@ pub async fn play_game(server_address: String) -> Result<String, Box<dyn std::er
         
         // println!("Player {} --- {}", game.current_player(), action);
         game.apply(action);
-
     }
 
     // Train the model
-    let data = tonic::Request::new(DataRep {
-        states: states,
-        policies: policies.into_iter().flatten().collect(),
+    let game_data = tonic::Request::new(GameRep {
+        history: game.history.iter().map(|(p, t)| Move{player: *p, tile: *t}).collect(),
+        policies: policies,
         values: game.get_payoff(),
     });
-    model.train(data).await?;
+    model.save(game_data).await?;
     
     // game.board.print_board();
     Ok(format!("Game finished with payoff: {:?}", game.get_payoff()))
