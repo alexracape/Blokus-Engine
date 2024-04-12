@@ -78,8 +78,9 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
             self.model = BlokusModel().to(self.device)
 
         # summary(self.model, [(5, 20, 20), (1, 1, 1)]) # for some reason dimension when summarizing is (2, 5, 20, 20)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.01)
-        self.loss = torch.nn.MSELoss().to(self.device)  # Might need to change to custom
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        self.policy_loss = torch.nn.CrossEntropyLoss().to(self.device)
+        self.value_loss = torch.nn.MSELoss().to(self.device)
 
     def Predict(self, request, context):
         boards = np.array(request.boards).reshape(5, 20, 20)
@@ -117,8 +118,8 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
             # Train the model
             self.optimizer.zero_grad()
             policy, value = self.model(inputs)
-            policy_loss = self.loss(policy, policies)
-            value_loss = self.loss(value, values)
+            policy_loss = self.policy_loss(policy, policies)
+            value_loss = self.value_loss(value, values)
             loss = policy_loss + value_loss
             loss.backward()
             self.optimizer.step()

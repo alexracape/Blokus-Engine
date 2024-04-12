@@ -31,6 +31,11 @@ const EXPLORATION_FRACTION: f32 = 0.25;
 /// Evaluate and Expand the Node
 async fn evaluate(node: &mut Node, game: &Game, model: &mut BlokusModelClient<Channel>) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
 
+    // If the game is over, return the payoff
+    if game.is_terminal() {
+        return Ok(game.get_payoff());
+    }
+
     // Get the policy and value from the neural network
     let representation = game.get_representation();
     let legal_moves = representation.boards[1600..2000].to_vec();
