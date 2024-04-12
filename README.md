@@ -27,9 +27,7 @@ On Tap:
 - Update the way moves are applied for GUI
 - Look into docker and kubernetes for deployment
 - Data augmentation for training
-- Reformatting communication code for more efficient ReplayBuffer
-    - Is it bad to have the client query using all of that data or should I compress. Bandwidth vs. server load
-    - Also, seems nice to seperate concerns and have model input rep in one place instead of both on client and server
+
 
 Plan:
 1. Add training capability in model
@@ -40,9 +38,8 @@ Plan:
 Questions:
 - What does it mean for the staet to be oriented to the current player? Should I shuffle the order of the boards to match,
 or should I just keep track of the current player and rotate the board accordingly?
-- Should I dynamically load states into the replay buffer, or sample from memory?
 - Should I pass in remaining pieces for the hard coded filters or something? Shouldn't the model be able to figure that out?
-- 
+- Is it weird that values are the same throughout the whole game? No unexpected moves?
 
 References
 - https://sebastianbodenstein.com/post/alphazero/

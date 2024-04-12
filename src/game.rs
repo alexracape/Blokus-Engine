@@ -194,10 +194,18 @@ impl Game {
             println!();
 
             // Advance to next player
-            let next = self.next_player();
-            self.legal_tiles = get_tile_moves(&self.board, next);
-            if self.legal_tiles.len() == 0 {
-                self.eliminate_player();
+            loop {
+                let next = self.next_player();
+                self.legal_tiles = get_tile_moves(&self.board, next);
+                if self.legal_tiles.len() == 0 {
+                    self.eliminate_player();
+                } else {
+                    break
+                }
+
+                if self.is_terminal() {
+                    break;
+                }
             }
         }
 
@@ -267,7 +275,7 @@ impl Game {
     }
 
     pub fn is_terminal(&self) -> bool {
-        self.players_remaining.len() == 1 || self.legal_tiles.len() == 0
+        self.players_remaining.len() == 0
     }
 
     /// Get a representation of the state for the neural network
