@@ -199,16 +199,15 @@ impl Game {
                 self.legal_tiles = get_tile_moves(&self.board, next);
                 if self.legal_tiles.len() == 0 {
                     self.eliminate_player();
+                    if self.is_terminal() {
+                        break;
+                    }
                 } else {
                     break
                 }
-
-                if self.is_terminal() {
-                    break;
-                }
             }
         }
-
+        
         Ok(())
     }
 
