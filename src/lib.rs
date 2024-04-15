@@ -3,7 +3,7 @@ mod pieces;
 mod game;
 mod node;
 
-pub mod simulation;
+pub mod client;
 pub mod gui;
 
 pub mod grpc {

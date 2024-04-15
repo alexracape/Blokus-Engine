@@ -1,4 +1,3 @@
-
 from concurrent import futures
 import grpc
 import model_pb2
@@ -8,6 +7,8 @@ import numpy as np
 import torch
 from torch.nn import Linear, ReLU, Conv2d
 from torchsummary import summary
+
+
 
 
 class BlokusModel(torch.nn.Module):
@@ -169,14 +170,24 @@ class ReplayBuffer:
             tile, prob = action.action, action.prob
             policy[tile] = prob
 
+        # Apply random transform for data augmentation to both state and policy
+        horizontal = np.random.choice([True, False])
+        vertical = np.random.choice([True, False])
+        if horizontal:
+            state = state.flip(0)
+            policy = policy.view(20, 20).flip(0).flatten()
+        if vertical:
+            state = state.flip(1)
+            policy = policy.view(20, 20).flip(1).flatten()
+
         return state, policy, values
 
 
 def serve():
-    print("Starting up server...")
+    print("Starting up server...", flush=True)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     model_pb2_grpc.add_BlokusModelServicer_to_server(BlokusModelServicer(), server)
-    server.add_insecure_port("[::]:50051")
+    server.add_insecure_port("[::]:8082")
     server.start()
     server.wait_for_termination()
 

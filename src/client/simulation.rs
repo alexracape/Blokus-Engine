@@ -15,7 +15,7 @@ use crate::node::Node;
 use crate::game::Game;
 
 
-const SIMULATIONS: usize = 1; // 800 in AlphaZero
+const SIMULATIONS: usize = 5; // 800 in AlphaZero
 const SAMPLE_MOVES: usize = 30;
 
 // Constants for UCB formula
@@ -207,13 +207,11 @@ pub async fn play_game(server_address: String) -> Result<String, Box<dyn std::er
 
     // Run self-play to generate data
     let mut game = Game::reset();
-    let mut states = Vec::new();
     let mut policies: Vec<Policy> = Vec::new();
     while !game.is_terminal() {
 
         // Get MCTS policy for current state
         // let mut policy = mcts(&game, &mut model).await?;
-        states.push(game.get_representation());
         let action = match mcts(&game, &mut model, &mut policies).await {
             Ok(a) => a,
             Err(e) => {

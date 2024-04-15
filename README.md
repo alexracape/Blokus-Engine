@@ -6,12 +6,12 @@ To open the GUI in the browser run:
 `trunk serve --open`
 
 To run server:
-`python src/model/model_server.py`
+`python model/model_server.py`
 
 To run simulation client:
 `cargo run --bin client`
 
-Generate server code: `python -m grpc_tools.protoc -Iproto --python_out=./src/model --pyi_out=./src/model --grpc_python_out=./src/model ./proto/model.proto`
+Generate server code: `python -m grpc_tools.protoc -Iproto --python_out=./model --pyi_out=./model --grpc_python_out=./model ./proto/model.proto`
 
 
 On Tap:
@@ -26,14 +26,12 @@ On Tap:
     - I made it thinking about the bit boards, but now there are also a lot of shape applications
 - Update the way moves are applied for GUI
 - Look into docker and kubernetes for deployment
-- Data augmentation for training
 
 
 Plan:
-1. Add training capability in model
-2. Fix GUI
-3. Implement undo
-4. Look into deployment
+1. Fix GUI
+2. Implement undo
+3. Look into deployment
 
 Questions:
 - What does it mean for the staet to be oriented to the current player? Should I shuffle the order of the boards to match,
