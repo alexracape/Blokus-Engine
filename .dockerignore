@@ -20,7 +20,6 @@
 **/*.*proj.user
 **/*.dbmdl
 **/*.jfm
-**/bin
 **/charts
 **/docker-compose*
 **/compose*
@@ -32,3 +31,4 @@
 **/values.dev.yaml
 LICENSE
 README.md
+/target
