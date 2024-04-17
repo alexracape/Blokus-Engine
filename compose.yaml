@@ -1,0 +1,6 @@
+
+services:
+  model-server:
+    build: .
+    dockerfile: model/Dockerfile
+    
