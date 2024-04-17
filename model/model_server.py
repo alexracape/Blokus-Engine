@@ -1,14 +1,21 @@
 from concurrent import futures
-import grpc
-import model_pb2
-import model_pb2_grpc
+import os
 
+import grpc
 import numpy as np
 import torch
 from torch.nn import Linear, ReLU, Conv2d
 from torchsummary import summary
+from dotenv import load_dotenv
 
+import model_pb2
+import model_pb2_grpc
 
+load_dotenv()
+
+PORT = os.getenv("PORT")
+BUFFER_CAPACITY = os.getenv("BUFFER_CAPACITY")
+DIM = 20
 
 
 class BlokusModel(torch.nn.Module):
@@ -21,7 +28,7 @@ class BlokusModel(torch.nn.Module):
         self.conv2 = Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
         self.conv3 = Conv2d(128, 1, kernel_size=3, stride=1, padding=1)
 
-        self.fc1 = Linear(20*20, 512)
+        self.fc1 = Linear(DIM * DIM, 512)
         self.fc2 = Linear(512, 256)
 
         self.policy_head = Linear(256, 400)
@@ -42,7 +49,7 @@ class BlokusModel(torch.nn.Module):
         x = self.relu(self.conv2(x))
         x = self.relu(self.conv3(x))
 
-        x = x.view(-1, 20*20)
+        x = x.view(-1, DIM * DIM)
         x = self.relu(self.fc1(x))
         x = self.relu(self.fc2(x))
 
@@ -84,7 +91,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         self.value_loss = torch.nn.MSELoss().to(self.device)
 
     def Predict(self, request, context):
-        boards = np.array(request.boards).reshape(5, 20, 20)
+        boards = np.array(request.boards).reshape(5, DIM, DIM)
         boards = torch.tensor(boards, dtype=torch.float32).to(self.device)
         player = request.player
 
@@ -131,7 +138,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
 class ReplayBuffer:
     """Buffer for storing game states for training the model"""
 
-    def __init__(self, capacity=1000):
+    def __init__(self, capacity=BUFFER_CAPACITY):
         self.capacity = capacity
         self.buffer = []
         self.total_moves = 0
@@ -155,14 +162,14 @@ class ReplayBuffer:
 
         # Get key data from the game
         history, policies, values = game
-        state = torch.zeros(5, 20, 20, dtype=torch.float32)
-        policy = torch.zeros(400, dtype=torch.float32)
+        state = torch.zeros(5, DIM, DIM, dtype=torch.float32)
+        policy = torch.zeros(DIM * DIM, dtype=torch.float32)
         values = torch.tensor(values, dtype=torch.float32)
 
         # Reconstruct state representation
         for j in range(i):
             player, tile = history[j].player, history[j].tile
-            row, col = tile // 20, tile % 20
+            row, col = tile // DIM, tile % DIM
             state[player, row, col] = True
 
         # reconstruct policy representation
@@ -175,10 +182,10 @@ class ReplayBuffer:
         vertical = np.random.choice([True, False])
         if horizontal:
             state = state.flip(0)
-            policy = policy.view(20, 20).flip(0).flatten()
+            policy = policy.view(DIM, DIM).flip(0).flatten()
         if vertical:
             state = state.flip(1)
-            policy = policy.view(20, 20).flip(1).flatten()
+            policy = policy.view(DIM, DIM).flip(1).flatten()
 
         return state, policy, values
 
@@ -187,7 +194,7 @@ def serve():
     print("Starting up server...", flush=True)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     model_pb2_grpc.add_BlokusModelServicer_to_server(BlokusModelServicer(), server)
-    server.add_insecure_port("[::]:8082")
+    server.add_insecure_port(f"[::]:{PORT}")
     server.start()
     server.wait_for_termination()
 
