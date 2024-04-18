@@ -13,6 +13,8 @@ To run simulation client:
 
 Generate server code: `python -m grpc_tools.protoc -Iproto --python_out=./model --pyi_out=./model --grpc_python_out=./model ./proto/model.proto`
 
+All configuration is stored in the environment in the form of environment variables. This follows the [12 factor app](https://12factor.net/config) methodology, and an example env file is provided in the root of the project.
+
 
 On Tap:
 - Undo
@@ -26,9 +28,11 @@ On Tap:
     - I made it thinking about the bit boards, but now there are also a lot of shape applications
 - Update the way moves are applied for GUI
 - Look into docker and kubernetes for deployment
+- Add example env
 
 
 Plan:
+0. Configure environment and docker compose
 1. Fix GUI
 2. Implement undo
 3. Look into deployment

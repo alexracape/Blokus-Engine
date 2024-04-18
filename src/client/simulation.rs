@@ -2,6 +2,8 @@
 use rand::Rng;
 use rand_distr::{Dirichlet, Distribution};
 use std::vec;
+use std::env;
+use dotenv;
 
 use crate::grpc::blokus_model_client::BlokusModelClient;
 use crate::grpc::ActionProb;
@@ -15,17 +17,29 @@ use crate::node::Node;
 use crate::game::Game;
 
 
-const SIMULATIONS: usize = 5; // 800 in AlphaZero
-const SAMPLE_MOVES: usize = 30;
+/// Configuration of the self-play simulation
+pub struct Config {
+    pub sims_per_move: usize,
+    pub sample_moves: usize,
+    pub c_base: f32,
+    pub c_init: f32,
+    pub dirichlet_alpha: f32,
+    pub exploration_fraction: f32,
+}
 
-// Constants for UCB formula
-const C_BASE: f32 = 19652.0;
-const C_INIT: f32 = 1.25;
-
-// Constants for exploration noise
-const DIRICHLET_ALPHA: f32 = 0.3; // Scaled for number of moves iin average game - revisit?
-const EXPLORATION_FRACTION: f32 = 0.25;
-
+impl Config {
+    pub fn build() -> Config {
+        // dotenv::dotenv().ok();
+        Config {
+            sims_per_move: env::var("SIMS_PER_MOVE").unwrap().parse::<usize>().unwrap(),
+            sample_moves: env::var("SAMPLE_MOVES").unwrap().parse::<usize>().unwrap(),
+            c_base: env::var("C_BASE").unwrap().parse::<f32>().unwrap(),
+            c_init: env::var("C_INIT").unwrap().parse::<f32>().unwrap(),
+            dirichlet_alpha: env::var("DIRICHLET_ALPHA").unwrap().parse::<f32>().unwrap(),
+            exploration_fraction: env::var("EXPLORATION_FRAC").unwrap().parse::<f32>().unwrap(),
+        }
+    }
+}
 
 
 /// Evaluate and Expand the Node
@@ -67,8 +81,10 @@ async fn evaluate(node: &mut Node, game: &Game, model: &mut BlokusModelClient<Ch
 /// Get UCB score for a child node
 /// Exploration constant is based on the number of visits to the parent node
 /// so that it will encourage exploration of nodes that have not been visited
-fn ucb_score(parent: &Node, child: &Node) -> f32 {
-    let exploration_constant = (parent.visits as f32 + C_BASE + 1.0 / C_BASE).ln() + C_INIT;
+fn ucb_score(parent: &Node, child: &Node, config: &Config) -> f32 {
+    let c_base = config.c_base;
+    let c_init = config.c_init;
+    let exploration_constant = (parent.visits as f32 + c_base + 1.0 / c_base).ln() + c_init;
     let prior_score = exploration_constant * child.prior;
     let value_score = child.value();
     prior_score + value_score
@@ -76,21 +92,20 @@ fn ucb_score(parent: &Node, child: &Node) -> f32 {
 
 
 /// Add noise to the root node to encourage exploration
-fn add_exploration_noise(root: &mut Node) -> () {
+fn add_exploration_noise(root: &mut Node, config: &Config) -> () {
     let num_actions = root.children.len();
     if num_actions <= 1 {
         return;
     }
 
-    let alpha_vec = vec![DIRICHLET_ALPHA; num_actions];
+    let alpha_vec = vec![config.dirichlet_alpha; num_actions];
     let dirichlet = Dirichlet::new(&alpha_vec).unwrap();
     let noise = dirichlet.sample(&mut rand::thread_rng());
     for (i, (_tile, node)) in root.children.iter_mut().enumerate() {
-        node.prior = node.prior * (1.0 - EXPLORATION_FRACTION) + noise[i] * EXPLORATION_FRACTION;
+        node.prior = node.prior * (1.0 - config.exploration_fraction) + noise[i] * config.exploration_fraction;
     }
 
 }
-
 
 
 /// Sample from a softmax distribution
@@ -113,11 +128,11 @@ fn softmax_sample(visit_dist: Vec<(usize, u32)>) -> usize {
 /// Select child node to explore
 /// Uses UCB formula to balance exploration and exploitation
 /// Returns the action and the child node's key
-fn select_child(node: &Node) -> usize {
+fn select_child(node: &Node, config: &Config) -> usize {
     let mut best_score = 0.0;
     let mut best_action = 0;
     for (action, child) in &node.children {
-        let score = ucb_score(node, child);
+        let score = ucb_score(node, child, config);
         if score > best_score {
             best_score = score;
             best_action = *action;
@@ -128,9 +143,9 @@ fn select_child(node: &Node) -> usize {
 
 
 /// Select action from policy
-fn select_action(root: &Node, num_moves: usize) -> usize {
+fn select_action(root: &Node, num_moves: usize, config: &Config) -> usize {
     let visit_dist: Vec<(usize, u32)> = root.children.iter().map(|(tile, node)| (*tile, node.visits)).collect();
-    if num_moves < SAMPLE_MOVES {
+    if num_moves < config.sample_moves {
         softmax_sample(visit_dist)
     } else {
         visit_dist.iter().max_by(|a, b| a.1.cmp(&b.1)).unwrap().0
@@ -152,7 +167,7 @@ fn backpropagate(search_path: Vec<usize>, root: &mut Node, values: Vec<f32>) -> 
 
 
 /// Run MCTS simulations to get policy for root node
-async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mut Vec<Policy>) -> Result<usize, Box<dyn std::error::Error>>{
+async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mut Vec<Policy>, config: &Config) -> Result<usize, Box<dyn std::error::Error>>{
     
     // Initialize root for these sims, evaluate it, and add children
     let mut root = Node::new(0.0);
@@ -163,16 +178,16 @@ async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mu
             return Err(e);
         }
     }
-    add_exploration_noise(&mut root);
+    add_exploration_noise(&mut root, config);
 
-    for _ in 0..SIMULATIONS {
+    for _ in 0..config.sims_per_move {
 
         // Select a leaf node
         let mut node = &mut root;
         let mut scratch_game = game.clone();
         let mut search_path = Vec::new();
         while node.is_expanded() {
-            let action = select_child(node);
+            let action = select_child(node, config);
             node = node.children.get_mut(&action).unwrap();
             scratch_game.apply(action); 
             search_path.push(action);
@@ -194,15 +209,17 @@ async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mu
     policies.push(Policy {probs: probs});
 
     // Pick action to take
-    let action = select_action(&root, policies.len());
+    let action = select_action(&root, policies.len(), config);
     Ok(action)
 }
 
 
 #[tokio::main]
 pub async fn play_game(server_address: String) -> Result<String, Box<dyn std::error::Error>> {
+    let config = Config::build();
 
     // Connect to neural network
+    println!("Connecting to server at: {}", server_address);
     let mut model = BlokusModelClient::connect(server_address).await?;
 
     // Run self-play to generate data
@@ -212,7 +229,7 @@ pub async fn play_game(server_address: String) -> Result<String, Box<dyn std::er
 
         // Get MCTS policy for current state
         // let mut policy = mcts(&game, &mut model).await?;
-        let action = match mcts(&game, &mut model, &mut policies).await {
+        let action = match mcts(&game, &mut model, &mut policies, &config).await {
             Ok(a) => a,
             Err(e) => {
                 println!("Error running MCTS: {:?}", e);
