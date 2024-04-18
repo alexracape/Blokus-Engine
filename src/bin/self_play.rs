@@ -1,14 +1,17 @@
+use std::env;
+use dotenv;
 use blokus_backend::client::simulation::play_game;
-
-
-const SELF_PLAY_GAMES: usize = 1; // 21 million for Go in AlphaZero
 
 
 fn main() {
 
-    let server_address = std::env::args().nth(1).unwrap_or("http://[::1]:8082".to_string());
-    for _ in 0..SELF_PLAY_GAMES {
-        let result = play_game(server_address.clone());
+    // Load environment variables from .env file
+    dotenv::dotenv().ok();
+    let games: usize = env::var("GAMES_PER_CLIENT").unwrap().parse::<usize>().unwrap(); 
+    let server_address = env::var("SERVER_ADDRESS").unwrap();
+
+    for _ in 0..games {
+        let result = play_game(format!("http://{}", server_address));
         match result {
             Ok(status) => println!("{}", status),
             Err(e) => {

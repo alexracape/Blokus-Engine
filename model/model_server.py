@@ -13,8 +13,11 @@ import model_pb2_grpc
 
 load_dotenv()
 
-PORT = os.getenv("PORT")
-BUFFER_CAPACITY = os.getenv("BUFFER_CAPACITY")
+SERVER_ADDRESS = os.getenv("SERVER_ADDRESS")
+BUFFER_CAPACITY = int(os.getenv("BUFFER_CAPACITY"))
+LEARNING_RATE = float(os.getenv("LEARNING_RATE"))
+BATCH_SIZE = int(os.getenv("BATCH_SIZE"))
+TRAINING_STEPS = int(os.getenv("TRAINING_STEPS"))
 DIM = 20
 
 
@@ -86,7 +89,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
             self.model = BlokusModel().to(self.device)
 
         # summary(self.model, [(5, 20, 20), (1, 1, 1)]) # for some reason dimension when summarizing is (2, 5, 20, 20)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
         self.policy_loss = torch.nn.CrossEntropyLoss().to(self.device)
         self.value_loss = torch.nn.MSELoss().to(self.device)
 
@@ -110,7 +113,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         return model_pb2.Status(code=0)
     
 
-    def Train(self, batch_size=256, training_steps=10):
+    def Train(self, batch_size=BATCH_SIZE, training_steps=TRAINING_STEPS):
         """Train the model using the data in the replay buffer"""
 
         for _ in range(training_steps):
@@ -194,7 +197,7 @@ def serve():
     print("Starting up server...", flush=True)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     model_pb2_grpc.add_BlokusModelServicer_to_server(BlokusModelServicer(), server)
-    server.add_insecure_port(f"[::]:{PORT}")
+    server.add_insecure_port(SERVER_ADDRESS)
     server.start()
     server.wait_for_termination()
 
