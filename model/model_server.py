@@ -13,7 +13,7 @@ import model_pb2_grpc
 
 load_dotenv()
 
-SERVER_ADDRESS = os.getenv("SERVER_ADDRESS")
+PORT = os.getenv("PORT")
 BUFFER_CAPACITY = int(os.getenv("BUFFER_CAPACITY"))
 LEARNING_RATE = float(os.getenv("LEARNING_RATE"))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE"))
@@ -197,7 +197,7 @@ def serve():
     print("Starting up server...", flush=True)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     model_pb2_grpc.add_BlokusModelServicer_to_server(BlokusModelServicer(), server)
-    server.add_insecure_port(SERVER_ADDRESS)
+    server.add_insecure_port(f"[::]:{PORT}")
     server.start()
     server.wait_for_termination()
 

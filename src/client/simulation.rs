@@ -3,7 +3,6 @@ use rand::Rng;
 use rand_distr::{Dirichlet, Distribution};
 use std::vec;
 use std::env;
-use dotenv;
 
 use crate::grpc::blokus_model_client::BlokusModelClient;
 use crate::grpc::ActionProb;
@@ -29,7 +28,6 @@ pub struct Config {
 
 impl Config {
     pub fn build() -> Config {
-        // dotenv::dotenv().ok();
         Config {
             sims_per_move: env::var("SIMS_PER_MOVE").unwrap().parse::<usize>().unwrap(),
             sample_moves: env::var("SAMPLE_MOVES").unwrap().parse::<usize>().unwrap(),
@@ -189,7 +187,7 @@ async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mu
         while node.is_expanded() {
             let action = select_child(node, config);
             node = node.children.get_mut(&action).unwrap();
-            scratch_game.apply(action); 
+            let _ = scratch_game.apply(action); 
             search_path.push(action);
         }
 
@@ -238,7 +236,7 @@ pub async fn play_game(server_address: String) -> Result<String, Box<dyn std::er
         };
         
         // println!("Player {} --- {}", game.current_player(), action);
-        game.apply(action);
+        let _ = game.apply(action);
     }
 
     // Train the model

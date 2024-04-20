@@ -8,10 +8,10 @@ fn main() {
     // Load environment variables from .env file
     dotenv::dotenv().ok();
     let games: usize = env::var("GAMES_PER_CLIENT").unwrap().parse::<usize>().unwrap(); 
-    let server_address = env::var("SERVER_ADDRESS").unwrap();
+    let server_address = env::var("SERVER_URL").unwrap();
 
     for _ in 0..games {
-        let result = play_game(format!("http://{}", server_address));
+        let result = play_game(server_address.clone());
         match result {
             Ok(status) => println!("{}", status),
             Err(e) => {

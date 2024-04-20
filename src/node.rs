@@ -1,8 +1,6 @@
 // Game Tree to be used by each MCTS simulation
 use std::collections::HashMap;
 
-const BOARD_SPACES: usize = 400;
-
 
 /// Each node in the game tree represents a state of the game
 /// There is one state for every tile placement

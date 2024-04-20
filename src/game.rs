@@ -41,7 +41,7 @@ fn get_piece_moves(piece_i: usize, board: &Board, player: usize) -> (Vec<(usize,
                             tiles.push(total_offset + j);
                         }
                     }
-                    tile_groups.push((tiles));
+                    tile_groups.push(tiles);
                     moves.push((piece_i, var_i, total_offset))
                 }
             }
@@ -101,7 +101,7 @@ impl Reducible for Game {
         match action {
             Action::PlacePiece(p, v, o) => {
                 let player = self.current_player().expect("No current player");
-                let mut new_state = (*self).clone();
+                let new_state = (*self).clone();
                 let piece = self.board.get_pieces(player)[p].variants[v].clone();
 
                 // Check if move is valid
@@ -137,7 +137,7 @@ impl Reducible for Game {
                 new_state.into()
             }
             Action::Undo => {
-                let mut new_state = (*self).clone();
+                let new_state = (*self).clone();
                 // TODO: Need to implement undo
                 new_state.into()
             }
