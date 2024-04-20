@@ -5,7 +5,7 @@ FROM rust:latest
 WORKDIR /client
 
 # Copy the Cargo.toml and Cargo.lock files to the working directory
-COPY Cargo.toml Cargo.lock build.rs ./
+COPY Cargo.toml Cargo.lock build.rs .env ./
 
 # Get protobuf dependencies
 RUN apt update && apt upgrade -y

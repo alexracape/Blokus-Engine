@@ -1,6 +1,24 @@
 
 services:
   model-server:
-    build: .
-    dockerfile: model/Dockerfile
-    
+    build: 
+      context: model
+      dockerfile: Dockerfile
+    ports:
+      - ${PORT}:${PORT}
+    environment:
+      PORT: ${PORT}
+      BUFFER_CAPACITY: ${BUFFER_CAPACITY}
+      LEARNING_RATE: ${LEARNING_RATE}
+      BATCH_SIZE: ${BATCH_SIZE}
+      TRAINING_STEPS: ${TRAINING_STEPS}
+
+  self-play-client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - model-server
+    environment:
+      SERVER_URL: http://model-server:${PORT}
+
