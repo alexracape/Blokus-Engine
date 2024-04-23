@@ -15,7 +15,7 @@ services:
 
   self-play-client:
     build:
-      context: .
+      context: self_play
       dockerfile: Dockerfile
     depends_on:
       - model-server

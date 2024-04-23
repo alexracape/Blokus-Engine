@@ -7,7 +7,7 @@ use yew::prelude::*;
 use yew::{function_component, html, Properties};
 use yew::events::DragEvent;
 
-use crate::board::BOARD_SIZE;
+use blokus::board::BOARD_SIZE;
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct Props {

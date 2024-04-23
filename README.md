@@ -33,6 +33,12 @@ On Tap:
 Plan:
 
 0. Restructure project as a workspace
+
+- Configure build targets
+- Correct all paths and imports
+- Add a README to each module
+- Test
+
 1. Fix GUI
 2. Implement undo
 3. Look into deployment

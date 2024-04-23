@@ -1,12 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::iter::zip;
-use std::rc::Rc;
-
-use gloo_console as console;
-use yew::prelude::*;
 
 use crate::board::Board;
-use crate::grpc::StateRepresentation;
 use crate::pieces::Piece;
 
 const BOARD_SPACES: usize = 400;
@@ -91,58 +86,6 @@ pub struct Game {
     player_index: usize,           // Index of the current player in players_remaining
     legal_tiles: HashMap<usize, HashSet<(usize, usize, usize)>>, // Map tile to index of the overall move
     last_piece_lens: [u32; 4], // Size of the last piece placed by each player
-}
-
-impl Reducible for Game {
-    type Action = Action;
-
-    fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
-        match action {
-            Action::PlacePiece(p, v, o) => {
-                let player = self.current_player().expect("No current player");
-                let new_state = (*self).clone();
-                let piece = self.board.get_pieces(player)[p].variants[v].clone();
-
-                // Check if move is valid
-                if !new_state.board.is_valid_move(player, &piece, o) {
-                    console::log!("Invalid move");
-                    return self.into();
-                }
-
-                // Remove piece from player and place piece
-                // player.pieces.remove(p);
-                // let used_spaces = new_state.board.place_piece(player, &piece, o);
-                // new_state.current_player = self.next_player();
-
-                // // Update anchors for all players
-                // for player in &mut new_state.players {
-                //     player.use_anchors(&used_spaces);
-                // }
-
-                // // Add move to stack
-                // new_state.history.push(used_spaces.into_iter().collect());
-
-                // // Return new state
-                new_state.into()
-            }
-            Action::Pass => {
-                let mut new_state = (*self).clone();
-                new_state.eliminate_player();
-
-                if new_state.is_terminal() {
-                    return Game::reset().into(); // TODO - need to handle better with message or something
-                }
-
-                new_state.into()
-            }
-            Action::Undo => {
-                let new_state = (*self).clone();
-                // TODO: Need to implement undo
-                new_state.into()
-            }
-            Action::ResetGame => Game::reset().into(),
-        }
-    }
 }
 
 impl Game {
@@ -279,33 +222,5 @@ impl Game {
 
     pub fn is_terminal(&self) -> bool {
         self.players_remaining.len() == 0
-    }
-
-    /// Get a representation of the state for the neural network
-    /// This representation includes the board and the legal tiles
-    /// Oriented to the current player
-    pub fn get_representation(&self) -> StateRepresentation {
-        // Get rep for the pieces on the board
-        let current_player = self.current_player().expect("No current player");
-        let board = &self.board.board;
-        let mut board_rep = [[false; BOARD_SPACES]; 5];
-        for i in 0..BOARD_SPACES {
-            let player = (board[i] & 0b1111) as usize; // check if there is a player piece
-            let player_board = (4 + player - current_player) % 4; // orient to current player (0 indexed)
-            if player != 0 {
-                board_rep[player_board][i] = true;
-            }
-        }
-
-        // Get rep for the legal spaces
-        let legal_moves = self.legal_tiles();
-        for tile in legal_moves {
-            board_rep[4][tile] = true;
-        }
-
-        StateRepresentation {
-            boards: board_rep.into_iter().flat_map(|inner| inner).collect(),
-            player: current_player as i32,
-        }
     }
 }

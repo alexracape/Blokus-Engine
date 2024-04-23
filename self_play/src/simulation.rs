@@ -9,11 +9,14 @@ use crate::grpc::ActionProb;
 use crate::grpc::Game as GameRep;
 use crate::grpc::Policy;
 use crate::grpc::Move;
+use crate::grpc::StateRepresentation;
 
 use tonic::transport::Channel;
 
+use blokus::game::Game;
+use blokus::board::BOARD_SIZE;
 use crate::node::Node;
-use crate::game::Game;
+
 
 
 /// Configuration of the self-play simulation
@@ -40,6 +43,41 @@ impl Config {
 }
 
 
+trait RpcRepr {
+    fn get_representation(&self) -> StateRepresentation;
+}
+
+
+impl RpcRepr for Game {
+    /// Get a representation of the state for the neural network
+    /// This representation includes the board and the legal tiles
+    /// Oriented to the current player
+    fn get_representation(&self) -> StateRepresentation {
+        // Get rep for the pieces on the board
+        let current_player = self.current_player().expect("No current player");
+        let board = &self.board.board;
+        let mut board_rep = [[false; BOARD_SIZE]; 5];
+        for i in 0..BOARD_SIZE {
+            let player = (board[i] & 0b1111) as usize; // check if there is a player piece
+            let player_board = (4 + player - current_player) % 4; // orient to current player (0 indexed)
+            if player != 0 {
+                board_rep[player_board][i] = true;
+            }
+        }
+
+        // Get rep for the legal spaces
+        let legal_moves = self.legal_tiles();
+        for tile in legal_moves {
+            board_rep[4][tile] = true;
+        }
+
+        StateRepresentation {
+            boards: board_rep.into_iter().flat_map(|inner| inner).collect(),
+            player: current_player as i32,
+        }
+    }
+}
+
 /// Evaluate and Expand the Node
 async fn evaluate(node: &mut Node, game: &Game, model: &mut BlokusModelClient<Channel>) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
 
@@ -65,7 +103,7 @@ async fn evaluate(node: &mut Node, game: &Game, model: &mut BlokusModelClient<Ch
         }
     }).collect();
     let total: f32 = exp_policy.iter().map(|(_, p)| p).sum();
-    
+
     // Expand the node with the policy
     node.to_play = game.current_player().unwrap();
     for (tile, prob) in exp_policy {
@@ -166,7 +204,7 @@ fn backpropagate(search_path: Vec<usize>, root: &mut Node, values: Vec<f32>) -> 
 
 /// Run MCTS simulations to get policy for root node
 async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mut Vec<Policy>, config: &Config) -> Result<usize, Box<dyn std::error::Error>>{
-    
+
     // Initialize root for these sims, evaluate it, and add children
     let mut root = Node::new(0.0);
     match evaluate(&mut root, game, model).await {
@@ -187,7 +225,7 @@ async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mu
         while node.is_expanded() {
             let action = select_child(node, config);
             node = node.children.get_mut(&action).unwrap();
-            let _ = scratch_game.apply(action); 
+            let _ = scratch_game.apply(action);
             search_path.push(action);
         }
 
@@ -234,7 +272,7 @@ pub async fn play_game(server_address: String) -> Result<String, Box<dyn std::er
                 return Err(e);
             }
         };
-        
+
         // println!("Player {} --- {}", game.current_player(), action);
         let _ = game.apply(action);
     }
@@ -246,8 +284,7 @@ pub async fn play_game(server_address: String) -> Result<String, Box<dyn std::er
         values: game.get_payoff(),
     });
     model.save(game_data).await?;
-    
+
     // game.board.print_board();
     Ok(format!("Game finished with payoff: {:?}", game.get_payoff()))
 }
-
