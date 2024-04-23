@@ -5,8 +5,8 @@ use std::rc::Rc;
 use gloo_console as console;
 use yew::prelude::*;
 
-use crate::grpc::StateRepresentation;
 use crate::board::Board;
+use crate::grpc::StateRepresentation;
 use crate::pieces::Piece;
 
 const BOARD_SPACES: usize = 400;
@@ -18,16 +18,18 @@ pub enum Action {
     ResetGame,
 }
 
-
 /// Get the legal moves for a piece
-fn get_piece_moves(piece_i: usize, board: &Board, player: usize) -> (Vec<(usize, usize, usize)>, Vec<Vec<usize>>) {
+fn get_piece_moves(
+    piece_i: usize,
+    board: &Board,
+    player: usize,
+) -> (Vec<(usize, usize, usize)>, Vec<Vec<usize>>) {
     let mut moves = Vec::new();
     let mut tile_groups = Vec::new();
     let piece = &board.get_pieces(player)[piece_i];
     for anchor in &board.get_anchors(player) {
         for (var_i, variant) in piece.variants.iter().enumerate() {
             for offset in &variant.offsets {
-
                 // Check underflow
                 if offset > anchor {
                     continue;
@@ -51,9 +53,8 @@ fn get_piece_moves(piece_i: usize, board: &Board, player: usize) -> (Vec<(usize,
     (moves, tile_groups)
 }
 
-
 /// Get the legal moves for a player, tile placements grouped by move
-fn get_moves(board: &Board, player: usize) -> (Vec<(usize, usize, usize)>, Vec<Vec<usize>>){
+fn get_moves(board: &Board, player: usize) -> (Vec<(usize, usize, usize)>, Vec<Vec<usize>>) {
     let mut moves = Vec::new();
     let mut tile_groups = Vec::new();
     for piece in 0..board.get_pieces(player).len() {
@@ -65,12 +66,11 @@ fn get_moves(board: &Board, player: usize) -> (Vec<(usize, usize, usize)>, Vec<V
     (moves, tile_groups)
 }
 
-
-/// Get the tile bases representation for legal moves
-fn get_tile_moves(board: &Board, player: usize, ) -> HashMap<usize, HashSet<(usize, usize, usize)>> {
+/// Get the tile based representation for legal moves
+fn get_tile_moves(board: &Board, player: usize) -> HashMap<usize, HashSet<(usize, usize, usize)>> {
     let mut tile_rep = HashMap::new();
     let (moves, tile_groups) = get_moves(board, player);
-    
+
     for (id, tiles) in zip(moves, tile_groups) {
         for tile in tiles {
             if !tile_rep.contains_key(&tile) {
@@ -83,13 +83,12 @@ fn get_tile_moves(board: &Board, player: usize, ) -> HashMap<usize, HashSet<(usi
     tile_rep
 }
 
-
 #[derive(Clone)]
 pub struct Game {
     pub board: Board,
-    pub history: Vec<(i32, i32)>, // Stack of moves
+    pub history: Vec<(i32, i32)>,  // Stack of moves
     players_remaining: Vec<usize>, // Indices of players still in the game
-    player_index: usize, // Index of the current player in players_remaining
+    player_index: usize,           // Index of the current player in players_remaining
     legal_tiles: HashMap<usize, HashSet<(usize, usize, usize)>>, // Map tile to index of the overall move
     last_piece_lens: [u32; 4], // Size of the last piece placed by each player
 }
@@ -162,11 +161,10 @@ impl Game {
     }
 
     pub fn apply(&mut self, tile: usize) -> Result<(), String> {
-
         // Place piece on board
         let current_player = match self.current_player() {
             Some(p) => p,
-            None => return Err("No current player".to_string())
+            None => return Err("No current player".to_string()),
         };
         self.board.place_tile(tile, current_player);
         self.history.push((current_player as i32, tile as i32));
@@ -174,10 +172,13 @@ impl Game {
         // Update legal tiles
         let valid_moves = match self.legal_tiles.remove(&tile) {
             Some(moves) => moves,
-            None => return Err("Invalid move".to_string())
+            None => return Err("Invalid move".to_string()),
         };
         for (tile, move_set) in self.legal_tiles.clone() {
-            self.legal_tiles.insert(tile, move_set.intersection(&valid_moves).map(|m| *m).collect());
+            self.legal_tiles.insert(
+                tile,
+                move_set.intersection(&valid_moves).map(|m| *m).collect(),
+            );
             if self.legal_tiles.get(&tile).unwrap().len() == 0 {
                 self.legal_tiles.remove(&tile);
             }
@@ -185,10 +186,10 @@ impl Game {
 
         // Advance to next player if necessary
         if self.legal_tiles.len() == 0 {
-
             // Removing the player's piece
             let (piece, _variant, _offset) = valid_moves.iter().next().unwrap();
-            self.last_piece_lens[current_player] = self.board.get_pieces(current_player).remove(*piece).points;
+            self.last_piece_lens[current_player] =
+                self.board.get_pieces(current_player).remove(*piece).points;
             self.board.use_piece(current_player, *piece);
             self.board.print_board();
             println!();
@@ -203,11 +204,11 @@ impl Game {
                         break;
                     }
                 } else {
-                    break
+                    break;
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -232,7 +233,10 @@ impl Game {
         }
 
         self.player_index = self.player_index % self.players_remaining.len();
-        self.legal_tiles = get_tile_moves(&self.board, self.current_player().expect("No current player"));
+        self.legal_tiles = get_tile_moves(
+            &self.board,
+            self.current_player().expect("No current player"),
+        );
     }
 
     pub fn get_current_player_pieces(&self) -> Vec<Piece> {
@@ -264,7 +268,7 @@ impl Game {
                 highest_score = *score;
             }
         }
-        
+
         for i in &indices {
             payoff[*i] = 1.0 / indices.len() as f32;
         }
@@ -281,7 +285,6 @@ impl Game {
     /// This representation includes the board and the legal tiles
     /// Oriented to the current player
     pub fn get_representation(&self) -> StateRepresentation {
-
         // Get rep for the pieces on the board
         let current_player = self.current_player().expect("No current player");
         let board = &self.board.board;
@@ -304,6 +307,5 @@ impl Game {
             boards: board_rep.into_iter().flat_map(|inner| inner).collect(),
             player: current_player as i32,
         }
-
     }
 }
