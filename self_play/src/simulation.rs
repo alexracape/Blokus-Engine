@@ -195,7 +195,7 @@ async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mu
         let values = evaluate(&mut node, &scratch_game, model).await?;
 
         // Backpropagate the value
-        backpropagate(search_path, &mut root, values) // Pass reference to node
+        backpropagate(search_path, &mut root, values)
     }
 
     // Save policy for this state
