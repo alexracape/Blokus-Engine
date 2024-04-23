@@ -165,21 +165,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed570934406eb16438a4e976b1b4500774099c13b8cb96eec99f620f05090ddf"
 
 [[package]]
-name = "blokus_backend"
+name = "blokus"
 version = "0.1.0"
-dependencies = [
- "dotenv",
- "gloo-console 0.3.0",
- "prost",
- "rand",
- "rand_distr",
- "tokio",
- "tonic",
- "tonic-build",
- "wasm-bindgen",
- "web-sys",
- "yew",
-]
 
 [[package]]
 name = "bumpalo"
@@ -714,6 +701,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.48",
+]
+
+[[package]]
+name = "gui"
+version = "0.1.0"
+dependencies = [
+ "blokus",
+ "gloo-console 0.3.0",
+ "wasm-bindgen",
+ "web-sys",
+ "yew",
 ]
 
 [[package]]
@@ -1302,6 +1300,20 @@ name = "ryu"
 version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f98d2aa92eebf49b69786be48e4477826b256916e84a57ff2a4f21923b48eb4c"
+
+[[package]]
+name = "self_play"
+version = "0.1.0"
+dependencies = [
+ "blokus",
+ "dotenv",
+ "prost",
+ "rand",
+ "rand_distr",
+ "tokio",
+ "tonic",
+ "tonic-build",
+]
 
 [[package]]
 name = "serde"

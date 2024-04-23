@@ -1,0 +1,6 @@
+[package]
+name = "blokus"
+version = "0.1.0"
+authors = ["Alex Racapé"]
+edition = "2021"
+
