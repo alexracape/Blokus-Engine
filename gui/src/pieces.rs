@@ -1,16 +1,14 @@
-
+use gloo_console as console;
 use wasm_bindgen::JsCast;
 use web_sys::HtmlElement;
-use gloo_console as console;
 
+use yew::events::DragEvent;
 use yew::prelude::*;
 use yew::{function_component, html, Properties};
-use yew::events::DragEvent;
 
-use crate::pieces::Piece;
-use yew::Callback;
+use blokus::pieces::{Piece, PieceVariant};
 use web_sys::KeyboardEvent;
-
+use yew::Callback;
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
@@ -20,13 +18,12 @@ pub struct Props {
 
 #[function_component]
 pub fn PieceTray(props: &Props) -> Html {
-    
     let color = match props.player_num {
         1 => "red",
         2 => "blue",
         3 => "green",
         4 => "yellow",
-        _ => "empty"
+        _ => "empty",
     };
     html! {
         <div class="piece-tray">
@@ -40,7 +37,6 @@ pub fn PieceTray(props: &Props) -> Html {
     }
 }
 
-
 #[derive(Properties, PartialEq)]
 pub struct PieceProps {
     pub piece: Piece,
@@ -50,7 +46,6 @@ pub struct PieceProps {
 
 #[function_component]
 fn GUIPiece(props: &PieceProps) -> Html {
-
     // State
     let variant = use_state(|| 0);
     let clicked_square = use_state(|| 0);
@@ -64,15 +59,22 @@ fn GUIPiece(props: &PieceProps) -> Html {
             let target: HtmlElement = target.dyn_into().unwrap();
             target.class_list().add_1("dragging").unwrap();
             let piece_variant = piece.variants.get(*variant).unwrap();
-            let offset = piece_variant.offsets.get(*clicked_square).unwrap().to_string();
+            let offset = piece_variant
+                .offsets
+                .get(*clicked_square)
+                .unwrap()
+                .to_string();
 
             let data = event.data_transfer().unwrap();
-            let _ = data.set_data("piece_num", target.get_attribute("data-piece-num").unwrap().as_str());
+            let _ = data.set_data(
+                "piece_num",
+                target.get_attribute("data-piece-num").unwrap().as_str(),
+            );
             let _ = data.set_data("variant", &*variant.to_string().as_str());
             let _ = data.set_data("piece_offset", offset.as_str());
             console::log!("Drag start", event);
             console::log!("Piece offset", offset);
-       } 
+        }
     };
 
     let squareclicked = {
@@ -101,15 +103,15 @@ fn GUIPiece(props: &PieceProps) -> Html {
         Callback::from(move |_| {
             let next = match num_variants {
                 1 => 0,
-                2 => {(*variant + 1) % 2},
-                4 => {(*variant + 1) % 4},
+                2 => (*variant + 1) % 2,
+                4 => (*variant + 1) % 4,
                 8 => {
                     if *variant > 3 {
                         (*variant + 1) % 4 + 4
                     } else {
                         (*variant + 1) % 4
                     }
-                },
+                }
                 _ => 0,
             };
             variant.set(next);
@@ -121,11 +123,11 @@ fn GUIPiece(props: &PieceProps) -> Html {
         let num_variants = props.piece.variants.len();
         let variant = variant.clone();
         Callback::from(move |_| {
-            let next = match num_variants  {
+            let next = match num_variants {
                 1 => 0,
                 2 => *variant,
-                4 => {(*variant + 2) % 4}, // Depends on symmetry of shape but this is okay for now
-                8 => {(*variant + 4) % 8},
+                4 => (*variant + 2) % 4, // Depends on symmetry of shape but this is okay for now
+                8 => (*variant + 4) % 8,
                 _ => 0,
             };
             variant.set(next);
@@ -134,22 +136,24 @@ fn GUIPiece(props: &PieceProps) -> Html {
     };
 
     let onkeypress = {
-        Callback::from(move |event: KeyboardEvent| {
-            match event.key().as_str() {
-                "r" => rotate.emit(event),
-                "f" => flip.emit(event),
-                _ => console::log!("Key pressed", event.key()),
-            }
+        Callback::from(move |event: KeyboardEvent| match event.key().as_str() {
+            "r" => rotate.emit(event),
+            "f" => flip.emit(event),
+            _ => console::log!("Key pressed", event.key()),
         })
     };
 
     let mut square_num = -1;
-    let v: &crate::pieces::PieceVariant = props.piece.variants.get(*variant).expect(format!("Variant {:?} not found", props.piece.variants).as_str());
+    let v: &PieceVariant = props
+        .piece
+        .variants
+        .get(*variant)
+        .expect(format!("Variant {:?} not found", props.piece.variants).as_str());
     html! {
         <div data-piece-num={props.piece_num.clone()} class={classes!("piece")} draggable="true" {ondragstart} {ondragend} {onkeypress} tabindex="0">
             {for v.get_shape().iter().enumerate().map(|(row_index, row)| html! {
                 <div class="grid-row" key={row_index}>
-                    { for row.iter().enumerate().map(|(col_index, &cell)| 
+                    { for row.iter().enumerate().map(|(col_index, &cell)|
                         if cell {
                             square_num += 1;
                             let onmousedown = squareclicked.clone();
