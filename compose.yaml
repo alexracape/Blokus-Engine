@@ -15,10 +15,18 @@ services:
 
   self-play-client:
     build:
-      context: .
+      context: self_play
       dockerfile: Dockerfile
     depends_on:
       - model-server
     environment:
       SERVER_URL: http://model-server:${PORT}
+    deploy:
+      replicas: ${NUM_CLIENTS}
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 10s
+      
 

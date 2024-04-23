@@ -1,0 +1,17 @@
+[package]
+name = "self_play"
+version = "0.1.0"
+authors = ["Alex Racapé"]
+edition = "2021"
+
+[dependencies]
+blokus = { path = "../blokus" }
+rand = "0.8"
+rand_distr = "0.4.3"
+tonic = "0.11"
+prost = "0.12"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+dotenv = "0.15.0"
+
+[build-dependencies]
+tonic-build = "0.11"
