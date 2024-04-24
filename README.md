@@ -27,17 +27,9 @@ On Tap:
 - Piece variants seem like a mess, is it worth refactoring?
   - I made it thinking about the bit boards, but now there are also a lot of shape applications
 - Update the way moves are applied for GUI
-- Look into docker and kubernetes for deployment
 - Add example env
 
 Plan:
-
-0. Restructure project as a workspace
-
-- Configure build targets
-- Correct all paths and imports
-- Add a README to each module
-- Test
 
 1. Fix GUI
 2. Implement undo

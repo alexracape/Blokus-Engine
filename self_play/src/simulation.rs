@@ -14,9 +14,11 @@ use crate::grpc::StateRepresentation;
 use tonic::transport::Channel;
 
 use blokus::game::Game;
-use blokus::board::BOARD_SIZE;
+use blokus::board::BOARD_SIZE as D;
 use crate::node::Node;
 
+
+const BOARD_SIZE: usize = D * D;
 
 
 /// Configuration of the self-play simulation
