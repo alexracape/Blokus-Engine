@@ -1,6 +1,6 @@
 # Blokus Engine
 
-Usage:
+## Usage:
 
 To open the GUI in the browser run:
 `trunk serve --open`
@@ -13,27 +13,53 @@ To run simulation client:
 
 Generate server code: `python -m grpc_tools.protoc -Iproto --python_out=./model --pyi_out=./model --grpc_python_out=./model ./proto/model.proto`
 
+## Configuration
+
 All configuration is stored in the environment in the form of environment variables. This follows the [12 factor app](https://12factor.net/config) methodology, and an example env file is provided in the root of the project.
 
-On Tap:
+#### Example .env file:
 
-- Undo
-- Benchmark board performance
-- Something is up with trunk server now, lots of compilation errors
-  - This is due to parts or tokio / tonic that are incompatible with wasm
-  - I could try to disable these modules for wasm build, but then I won't be able to use the
-    GUI to connect to the model. Maybe I could use another library later for that
-- Handle game over in gui instead of just resetting (state.rs)
-- Piece variants seem like a mess, is it worth refactoring?
-  - I made it thinking about the bit boards, but now there are also a lot of shape applications
-- Update the way moves are applied for GUI
-- Add example env
+```
+PORT=8000
+SERVER_URL=http://[::1]:8000
 
-Plan:
+# Server
+BUFFER_CAPACITY=1000 # Games
+LEARNING_RATE=0.001  # Changes from 0.01 to 0.0001 for AlphaZero
+BATCH_SIZE=256       # 2048 for AlphaZero
+TRAINING_STEPS=10    # 700,000 for AlphaZero
 
-1. Fix GUI
-2. Implement undo
-3. Look into deployment
+# Client
+NUM_CLIENTS=1
+GAMES_PER_CLIENT=1  # 21 million total games for Go in AlphaZero
+SIMS_PER_MOVE=10    # 800 for AlphaZero
+SAMPLE_MOVES=30     # 30 for AlphaZero
+C_BASE=19652        # 19652 for AlphaZero
+C_INIT=1.25         # 1.25 for AlphaZero
+DIRICHLET_ALPHA=0.3 # 0.03 for AlphaZero
+EXPLORATION_FRAC=0.25   # 0.25 for AlphaZero
+```
+
+## On Tap:
+
+Gui:
+
+- Fix basic functionality
+- Add undo
+- Figure out how to connect to model
+- Elegant way to handle terminal states
+
+Self Play:
+
+- Add loop for coordinating training rounds
+- Add capability to record data from training rounds
+- ResNet Backbone for neural network
+
+Miscelaneous:
+
+- Example env file, maybe just in readme
+- Benchmarks for testing performance
+- Is it worth refactoring the way pieces are structured
 
 Questions:
 
@@ -41,7 +67,7 @@ Questions:
   or should I just keep track of the current player and rotate the board accordingly?
 - Should I pass in remaining pieces for the hard coded filters or something? Shouldn't the model be able to figure that out?
 
-References
+## References
 
 - https://sebastianbodenstein.com/post/alphazero/
 - https://arxiv.org/pdf/1712.01815.pdf
