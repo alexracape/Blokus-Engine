@@ -18,6 +18,8 @@ BUFFER_CAPACITY = int(os.getenv("BUFFER_CAPACITY"))
 LEARNING_RATE = float(os.getenv("LEARNING_RATE"))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE"))
 TRAINING_STEPS = int(os.getenv("TRAINING_STEPS"))
+GAMES_PER_ROUND = int(os.getenv("NUM_CLIENTS")) * int(os.getenv("GAMES_PER_CLIENT"))
+TRAINING_ROUNDS = int(os.getenv("TRAINING_ROUNDS"))
 DIM = 20
 
 
@@ -36,12 +38,12 @@ class BlokusModel(torch.nn.Module):
 
         self.policy_head = Linear(256, 400)
         self.value_head = Linear(256, 4)
-        
+
         self.relu = ReLU()
 
     def forward(self, boards):
         """Get the policy and value for the given board state
-        
+
         For now, the board is represented by a 20x20x5 tensor where the first 4 channels are
         binary boards for each player's pieces on the board. The 5th channel is a binary board
         with the valid moves for the current player. For now, I'm just going to use the boards.
@@ -70,8 +72,8 @@ class BlokusModel(torch.nn.Module):
 
 class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
     """Servicer for the Blokus model using gRPC
-    
-    The model is a CNN that takes input of size 20x20x4 + 21x4 + 4. 
+
+    The model is a CNN that takes input of size 20x20x4 + 21x4 + 4.
     This is from 4 planes for each player's pieces on the board then each
     player's remaining pieces and the player who's turn it is.
     The model outputs a policy and a value. The policy is a probability
@@ -83,6 +85,8 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.buffer = ReplayBuffer()
+        self.training_round = 0
+        self.num_saves = 0
         if model_path:
             self.model = torch.load(model_path, map_location=self.device)
         else:
@@ -102,16 +106,34 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
             policy, values = self.model(boards)
         print(values)
         return model_pb2.Target(policy=policy[0], value=values[0])
-    
+
+
+    def Check(self, request, context):
+        """Check in with the server to see if it is on the next round of training
+
+        This is used intermitently by the client to check if it is in sync
+        with the server. If the server is on the next round of training, the
+        client will start the next round of self-play / data generation.
+        Returns the current training round.
+        """
+
+        return model_pb2.Status(code=self.training_round)
 
     def Save(self, request, context):
         """Store data in the replay buffer"""
 
         self.buffer.add(request.history, request.policies, request.values)
         print("Buffer size: ", len(self.buffer.buffer))
-        self.Train()
+        # self.Train() # For testing
+        self.num_saves += 1
+        if self.num_saves == GAMES_PER_ROUND:
+            self.Train()
+            self.num_saves = 0
+        if self.training_round == TRAINING_ROUNDS:
+            torch.save(self.model, "model.pt")
+
         return model_pb2.Status(code=0)
-    
+
 
     def Train(self, batch_size=BATCH_SIZE, training_steps=TRAINING_STEPS):
         """Train the model using the data in the replay buffer"""
@@ -135,8 +157,9 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
             loss.backward()
             self.optimizer.step()
 
+        self.training_round += 1
         return model_pb2.Status(code=0)
-    
+
 
 class ReplayBuffer:
     """Buffer for storing game states for training the model"""
@@ -157,7 +180,7 @@ class ReplayBuffer:
         weights = [len(game[0]) / self.total_moves for game in self.buffer]
         games = np.random.choice(len(self.buffer), batch_size, p=weights)
         return [self.training_data(self.buffer[i]) for i in games]
-    
+
     def training_data(self, game):
 
         # Get random move from the game

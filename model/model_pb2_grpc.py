@@ -24,6 +24,11 @@ class BlokusModelStub(object):
                 request_serializer=model__pb2.Game.SerializeToString,
                 response_deserializer=model__pb2.Status.FromString,
                 )
+        self.Check = channel.unary_unary(
+                '/blokusmodel.BlokusModel/Check',
+                request_serializer=model__pb2.Empty.SerializeToString,
+                response_deserializer=model__pb2.Status.FromString,
+                )
 
 
 class BlokusModelServicer(object):
@@ -41,6 +46,12 @@ class BlokusModelServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Check(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_BlokusModelServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -52,6 +63,11 @@ def add_BlokusModelServicer_to_server(servicer, server):
             'Save': grpc.unary_unary_rpc_method_handler(
                     servicer.Save,
                     request_deserializer=model__pb2.Game.FromString,
+                    response_serializer=model__pb2.Status.SerializeToString,
+            ),
+            'Check': grpc.unary_unary_rpc_method_handler(
+                    servicer.Check,
+                    request_deserializer=model__pb2.Empty.FromString,
                     response_serializer=model__pb2.Status.SerializeToString,
             ),
     }
@@ -94,6 +110,23 @@ class BlokusModel(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/blokusmodel.BlokusModel/Save',
             model__pb2.Game.SerializeToString,
+            model__pb2.Status.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Check(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/blokusmodel.BlokusModel/Check',
+            model__pb2.Empty.SerializeToString,
             model__pb2.Status.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

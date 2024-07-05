@@ -58,3 +58,7 @@ class Status(_message.Message):
     CODE_FIELD_NUMBER: _ClassVar[int]
     code: int
     def __init__(self, code: _Optional[int] = ...) -> None: ...
+
+class Empty(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...

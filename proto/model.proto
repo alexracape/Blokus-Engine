@@ -36,7 +36,10 @@ message Status {
     int32 code = 1;
 }
 
+message Empty {}
+
 service BlokusModel {
     rpc Predict(StateRepresentation) returns (Target) {}
     rpc Save(Game) returns (Status) {}
+    rpc Check(Empty) returns (Status) {}
 }

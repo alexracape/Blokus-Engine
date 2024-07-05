@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0bmodel.proto\x12\x0b\x62lokusmodel\"5\n\x13StateRepresentation\x12\x0e\n\x06\x62oards\x18\x01 \x03(\x08\x12\x0e\n\x06player\x18\x03 \x01(\x05\"\'\n\x06Target\x12\x0e\n\x06policy\x18\x01 \x03(\x02\x12\r\n\x05value\x18\x02 \x03(\x02\"$\n\x04Move\x12\x0e\n\x06player\x18\x01 \x01(\x05\x12\x0c\n\x04tile\x18\x02 \x01(\x05\"*\n\nActionProb\x12\x0e\n\x06\x61\x63tion\x18\x01 \x01(\x05\x12\x0c\n\x04prob\x18\x02 \x01(\x02\"0\n\x06Policy\x12&\n\x05probs\x18\x01 \x03(\x0b\x32\x17.blokusmodel.ActionProb\"a\n\x04Game\x12\"\n\x07history\x18\x01 \x03(\x0b\x32\x11.blokusmodel.Move\x12%\n\x08policies\x18\x02 \x03(\x0b\x32\x13.blokusmodel.Policy\x12\x0e\n\x06values\x18\x03 \x03(\x02\"\x16\n\x06Status\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x32\x83\x01\n\x0b\x42lokusModel\x12\x42\n\x07Predict\x12 .blokusmodel.StateRepresentation\x1a\x13.blokusmodel.Target\"\x00\x12\x30\n\x04Save\x12\x11.blokusmodel.Game\x1a\x13.blokusmodel.Status\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0bmodel.proto\x12\x0b\x62lokusmodel\"5\n\x13StateRepresentation\x12\x0e\n\x06\x62oards\x18\x01 \x03(\x08\x12\x0e\n\x06player\x18\x03 \x01(\x05\"\'\n\x06Target\x12\x0e\n\x06policy\x18\x01 \x03(\x02\x12\r\n\x05value\x18\x02 \x03(\x02\"$\n\x04Move\x12\x0e\n\x06player\x18\x01 \x01(\x05\x12\x0c\n\x04tile\x18\x02 \x01(\x05\"*\n\nActionProb\x12\x0e\n\x06\x61\x63tion\x18\x01 \x01(\x05\x12\x0c\n\x04prob\x18\x02 \x01(\x02\"0\n\x06Policy\x12&\n\x05probs\x18\x01 \x03(\x0b\x32\x17.blokusmodel.ActionProb\"a\n\x04Game\x12\"\n\x07history\x18\x01 \x03(\x0b\x32\x11.blokusmodel.Move\x12%\n\x08policies\x18\x02 \x03(\x0b\x32\x13.blokusmodel.Policy\x12\x0e\n\x06values\x18\x03 \x03(\x02\"\x16\n\x06Status\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\"\x07\n\x05\x45mpty2\xb7\x01\n\x0b\x42lokusModel\x12\x42\n\x07Predict\x12 .blokusmodel.StateRepresentation\x1a\x13.blokusmodel.Target\"\x00\x12\x30\n\x04Save\x12\x11.blokusmodel.Game\x1a\x13.blokusmodel.Status\"\x00\x12\x32\n\x05\x43heck\x12\x12.blokusmodel.Empty\x1a\x13.blokusmodel.Status\"\x00\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -35,6 +35,8 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _globals['_GAME']._serialized_end=353
   _globals['_STATUS']._serialized_start=355
   _globals['_STATUS']._serialized_end=377
-  _globals['_BLOKUSMODEL']._serialized_start=380
-  _globals['_BLOKUSMODEL']._serialized_end=511
+  _globals['_EMPTY']._serialized_start=379
+  _globals['_EMPTY']._serialized_end=386
+  _globals['_BLOKUSMODEL']._serialized_start=389
+  _globals['_BLOKUSMODEL']._serialized_end=572
 # @@protoc_insertion_point(module_scope)

@@ -1,25 +1,23 @@
 // One game of self-play using MCTS and a neural network
 use rand::Rng;
 use rand_distr::{Dirichlet, Distribution};
-use std::vec;
 use std::env;
+use std::vec;
 
 use crate::grpc::blokus_model_client::BlokusModelClient;
 use crate::grpc::ActionProb;
 use crate::grpc::Game as GameRep;
-use crate::grpc::Policy;
 use crate::grpc::Move;
+use crate::grpc::Policy;
 use crate::grpc::StateRepresentation;
 
 use tonic::transport::Channel;
 
-use blokus::game::Game;
-use blokus::board::BOARD_SIZE as D;
 use crate::node::Node;
-
+use blokus::board::BOARD_SIZE as D;
+use blokus::game::Game;
 
 const BOARD_SIZE: usize = D * D;
-
 
 /// Configuration of the self-play simulation
 pub struct Config {
@@ -39,16 +37,17 @@ impl Config {
             c_base: env::var("C_BASE").unwrap().parse::<f32>().unwrap(),
             c_init: env::var("C_INIT").unwrap().parse::<f32>().unwrap(),
             dirichlet_alpha: env::var("DIRICHLET_ALPHA").unwrap().parse::<f32>().unwrap(),
-            exploration_fraction: env::var("EXPLORATION_FRAC").unwrap().parse::<f32>().unwrap(),
+            exploration_fraction: env::var("EXPLORATION_FRAC")
+                .unwrap()
+                .parse::<f32>()
+                .unwrap(),
         }
     }
 }
 
-
 trait RpcRepr {
     fn get_representation(&self) -> StateRepresentation;
 }
-
 
 impl RpcRepr for Game {
     /// Get a representation of the state for the neural network
@@ -81,8 +80,11 @@ impl RpcRepr for Game {
 }
 
 /// Evaluate and Expand the Node
-async fn evaluate(node: &mut Node, game: &Game, model: &mut BlokusModelClient<Channel>) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
-
+async fn evaluate(
+    node: &mut Node,
+    game: &Game,
+    model: &mut BlokusModelClient<Channel>,
+) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
     // If the game is over, return the payoff
     if game.is_terminal() {
         return Ok(game.get_payoff());
@@ -97,13 +99,17 @@ async fn evaluate(node: &mut Node, game: &Game, model: &mut BlokusModelClient<Ch
     let value = prediction.value;
 
     // Normalize policy for node priors, filter out illegal moves
-    let exp_policy: Vec<(usize, f32)> = policy.iter().enumerate().filter_map(|(i, &logit)| {
-        if legal_moves[i] {
-            Some((i, logit.exp()))
-        } else {
-            None
-        }
-    }).collect();
+    let exp_policy: Vec<(usize, f32)> = policy
+        .iter()
+        .enumerate()
+        .filter_map(|(i, &logit)| {
+            if legal_moves[i] {
+                Some((i, logit.exp()))
+            } else {
+                None
+            }
+        })
+        .collect();
     let total: f32 = exp_policy.iter().map(|(_, p)| p).sum();
 
     // Expand the node with the policy
@@ -114,7 +120,6 @@ async fn evaluate(node: &mut Node, game: &Game, model: &mut BlokusModelClient<Ch
 
     Ok(value)
 }
-
 
 /// Get UCB score for a child node
 /// Exploration constant is based on the number of visits to the parent node
@@ -128,7 +133,6 @@ fn ucb_score(parent: &Node, child: &Node, config: &Config) -> f32 {
     prior_score + value_score
 }
 
-
 /// Add noise to the root node to encourage exploration
 fn add_exploration_noise(root: &mut Node, config: &Config) -> () {
     let num_actions = root.children.len();
@@ -140,11 +144,10 @@ fn add_exploration_noise(root: &mut Node, config: &Config) -> () {
     let dirichlet = Dirichlet::new(&alpha_vec).unwrap();
     let noise = dirichlet.sample(&mut rand::thread_rng());
     for (i, (_tile, node)) in root.children.iter_mut().enumerate() {
-        node.prior = node.prior * (1.0 - config.exploration_fraction) + noise[i] * config.exploration_fraction;
+        node.prior = node.prior * (1.0 - config.exploration_fraction)
+            + noise[i] * config.exploration_fraction;
     }
-
 }
-
 
 /// Sample from a softmax distribution
 /// Used to select actions during the first few moves to encourage exploration
@@ -162,7 +165,6 @@ fn softmax_sample(visit_dist: Vec<(usize, u32)>) -> usize {
     visit_dist.last().unwrap().0
 }
 
-
 /// Select child node to explore
 /// Uses UCB formula to balance exploration and exploitation
 /// Returns the action and the child node's key
@@ -179,22 +181,22 @@ fn select_child(node: &Node, config: &Config) -> usize {
     best_action
 }
 
-
 /// Select action from policy
 fn select_action(root: &Node, num_moves: usize, config: &Config) -> usize {
-    let visit_dist: Vec<(usize, u32)> = root.children.iter().map(|(tile, node)| (*tile, node.visits)).collect();
+    let visit_dist: Vec<(usize, u32)> = root
+        .children
+        .iter()
+        .map(|(tile, node)| (*tile, node.visits))
+        .collect();
     if num_moves < config.sample_moves {
         softmax_sample(visit_dist)
     } else {
         visit_dist.iter().max_by(|a, b| a.1.cmp(&b.1)).unwrap().0
     }
-
 }
-
 
 /// Update node when visitied during backpropagation
 fn backpropagate(search_path: Vec<usize>, root: &mut Node, values: Vec<f32>) -> () {
-
     let mut node = root;
     for tile in search_path {
         node = node.children.get_mut(&tile).unwrap();
@@ -203,10 +205,13 @@ fn backpropagate(search_path: Vec<usize>, root: &mut Node, values: Vec<f32>) -> 
     }
 }
 
-
 /// Run MCTS simulations to get policy for root node
-async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mut Vec<Policy>, config: &Config) -> Result<usize, Box<dyn std::error::Error>>{
-
+async fn mcts(
+    game: &Game,
+    model: &mut BlokusModelClient<Channel>,
+    policies: &mut Vec<Policy>,
+    config: &Config,
+) -> Result<usize, Box<dyn std::error::Error>> {
     // Initialize root for these sims, evaluate it, and add children
     let mut root = Node::new(0.0);
     match evaluate(&mut root, game, model).await {
@@ -219,7 +224,6 @@ async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mu
     add_exploration_noise(&mut root, config);
 
     for _ in 0..config.sims_per_move {
-
         // Select a leaf node
         let mut node = &mut root;
         let mut scratch_game = game.clone();
@@ -239,35 +243,41 @@ async fn mcts(game: &Game, model: &mut BlokusModelClient<Channel>, policies: &mu
     }
 
     // Save policy for this state
-    let total_visits: u32 = root.children.iter().map(|(_tile, child)| child.visits).sum();
-    let probs = root.children.iter().map(|(tile, child)| {
-        let p = (child.visits as f32) / (total_visits as f32);
-        ActionProb {action: *tile as i32, prob: p}
-    }).collect();
-    policies.push(Policy {probs: probs});
+    let total_visits: u32 = root
+        .children
+        .iter()
+        .map(|(_tile, child)| child.visits)
+        .sum();
+    let probs = root
+        .children
+        .iter()
+        .map(|(tile, child)| {
+            let p = (child.visits as f32) / (total_visits as f32);
+            ActionProb {
+                action: *tile as i32,
+                prob: p,
+            }
+        })
+        .collect();
+    policies.push(Policy { probs: probs });
 
     // Pick action to take
     let action = select_action(&root, policies.len(), config);
     Ok(action)
 }
 
-
-#[tokio::main]
-pub async fn play_game(server_address: String) -> Result<String, Box<dyn std::error::Error>> {
+pub async fn play_game(
+    model: &mut BlokusModelClient<Channel>,
+) -> Result<String, Box<dyn std::error::Error>> {
     let config = Config::build();
-
-    // Connect to neural network
-    println!("Connecting to server at: {}", server_address);
-    let mut model = BlokusModelClient::connect(server_address).await?;
 
     // Run self-play to generate data
     let mut game = Game::reset();
     let mut policies: Vec<Policy> = Vec::new();
     while !game.is_terminal() {
-
         // Get MCTS policy for current state
         // let mut policy = mcts(&game, &mut model).await?;
-        let action = match mcts(&game, &mut model, &mut policies, &config).await {
+        let action = match mcts(&game, model, &mut policies, &config).await {
             Ok(a) => a,
             Err(e) => {
                 println!("Error running MCTS: {:?}", e);
@@ -281,12 +291,22 @@ pub async fn play_game(server_address: String) -> Result<String, Box<dyn std::er
 
     // Train the model
     let game_data = tonic::Request::new(GameRep {
-        history: game.history.iter().map(|(p, t)| Move{player: *p, tile: *t}).collect(),
+        history: game
+            .history
+            .iter()
+            .map(|(p, t)| Move {
+                player: *p,
+                tile: *t,
+            })
+            .collect(),
         policies: policies,
         values: game.get_payoff(),
     });
     model.save(game_data).await?;
 
     // game.board.print_board();
-    Ok(format!("Game finished with payoff: {:?}", game.get_payoff()))
+    Ok(format!(
+        "Game finished with payoff: {:?}",
+        game.get_payoff()
+    ))
 }

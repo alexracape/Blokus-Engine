@@ -9,7 +9,7 @@ To run server:
 `python model/model_server.py`
 
 To run simulation client:
-`cargo run --bin client`
+`cargo run --bin self_play`
 
 Generate server code: `python -m grpc_tools.protoc -Iproto --python_out=./model --pyi_out=./model --grpc_python_out=./model ./proto/model.proto`
 
@@ -57,7 +57,6 @@ Self Play:
 
 Miscelaneous:
 
-- Example env file, maybe just in readme
 - Benchmarks for testing performance
 - Is it worth refactoring the way pieces are structured
 
