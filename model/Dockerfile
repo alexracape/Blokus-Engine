@@ -5,7 +5,7 @@ FROM python:3.10-slim
 WORKDIR /server
 
 # Copy server code to the container
-COPY . /server
+COPY . . 
 
 # Install the required packages
 RUN pip install -r requirements.txt

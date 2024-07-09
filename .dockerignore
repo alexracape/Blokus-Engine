@@ -32,3 +32,6 @@
 LICENSE
 README.md
 /target
+/model
+/dist
+model.pt

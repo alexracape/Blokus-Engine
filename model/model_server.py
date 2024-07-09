@@ -11,16 +11,29 @@ from dotenv import load_dotenv
 import model_pb2
 import model_pb2_grpc
 
-load_dotenv()
 
-PORT = os.getenv("PORT")
-BUFFER_CAPACITY = int(os.getenv("BUFFER_CAPACITY"))
-LEARNING_RATE = float(os.getenv("LEARNING_RATE"))
-BATCH_SIZE = int(os.getenv("BATCH_SIZE"))
-TRAINING_STEPS = int(os.getenv("TRAINING_STEPS"))
-GAMES_PER_ROUND = int(os.getenv("NUM_CLIENTS")) * int(os.getenv("GAMES_PER_CLIENT"))
-TRAINING_ROUNDS = int(os.getenv("TRAINING_ROUNDS"))
-DIM = 20
+# Load environment variables
+# Try to use environment variables first, if they don't exist, use check .env file
+# Right now docker is configured to use environment variables
+try: 
+    PORT = os.environ["PORT"]
+    BUFFER_CAPACITY = int(os.environ["BUFFER_CAPACITY"])
+    LEARNING_RATE = float(os.environ["LEARNING_RATE"])
+    BATCH_SIZE = int(os.environ["BATCH_SIZE"])
+    TRAINING_STEPS = int(os.environ["TRAINING_STEPS"])
+    GAMES_PER_ROUND = int(os.environ["NUM_CLIENTS"]) * int(os.environ["GAMES_PER_CLIENT"])
+    TRAINING_ROUNDS = int(os.environ["TRAINING_ROUNDS"])
+    DIM = 20
+except:
+    load_dotenv()
+    PORT = os.getenv("PORT")
+    BUFFER_CAPACITY = int(os.getenv("BUFFER_CAPACITY"))
+    LEARNING_RATE = float(os.getenv("LEARNING_RATE"))
+    BATCH_SIZE = int(os.getenv("BATCH_SIZE"))
+    TRAINING_STEPS = int(os.getenv("TRAINING_STEPS"))
+    GAMES_PER_ROUND = int(os.getenv("NUM_CLIENTS")) * int(os.getenv("GAMES_PER_CLIENT"))
+    TRAINING_ROUNDS = int(os.getenv("TRAINING_ROUNDS"))
+    DIM = 20 
 
 
 class BlokusModel(torch.nn.Module):
