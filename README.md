@@ -51,7 +51,8 @@ Gui:
 
 Self Play:
 
-- Add loop for coordinating training rounds
+- Test coordination with multiple clients using docker - 2 clients 2 rounds
+- Set poke time for clients as env variable
 - Add capability to record data from training rounds
 - ResNet Backbone for neural network
 

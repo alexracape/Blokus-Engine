@@ -30,14 +30,14 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Connecting to server at: {}", server_address);
     let mut model = BlokusModelClient::connect(server_address).await?;
 
-    let round = 0;
+    let mut round = 0;
     while round < rounds {
         
         // Play games to generate data
-        for _ in 0..games {
+        for i in 0..games {
             let result = play_game(&mut model).await;
             match result {
-                Ok(status) => println!("{}", status),
+                Ok(status) => println!("Game {i} finished: {}", status),
                 Err(e) => {
                     println!("Error playing game: {:?}", e);
                     break;
@@ -56,8 +56,10 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 break;
             }
         } 
+        round += 1;
 
     }
 
+    println!("Training complete!");
     Ok(())
 }

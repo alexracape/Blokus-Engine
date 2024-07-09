@@ -1,6 +1,8 @@
 
 services:
   model-server:
+    env_file:
+      - .env
     build: 
       context: model
       dockerfile: Dockerfile
@@ -12,14 +14,19 @@ services:
       LEARNING_RATE: ${LEARNING_RATE}
       BATCH_SIZE: ${BATCH_SIZE}
       TRAINING_STEPS: ${TRAINING_STEPS}
+      NUM_CLIENTS: ${NUM_CLIENTS}
+      TRAINING_ROUNDS: ${TRAINING_ROUNDS}
 
   self-play-client:
+    env_file:
+      - .env
     build:
-      context: self_play
       dockerfile: Dockerfile
     depends_on:
       - model-server
     environment:
+      GAMES_PER_CLIENT: ${GAMES_PER_CLIENT}
+      TRAINING_ROUNDS: ${TRAINING_ROUNDS}
       SERVER_URL: http://model-server:${PORT}
     deploy:
       replicas: ${NUM_CLIENTS}
