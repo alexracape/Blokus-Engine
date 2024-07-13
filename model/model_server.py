@@ -1,5 +1,6 @@
 from concurrent import futures
 import os
+import logging
 
 import grpc
 import numpy as np
@@ -12,29 +13,43 @@ import model_pb2
 import model_pb2_grpc
 
 
-# Load environment variables
-# Try to use environment variables first, if they don't exist, use check .env file
-# Right now docker is configured to use environment variables
-try: 
-    PORT = os.environ["PORT"]
-    BUFFER_CAPACITY = int(os.environ["BUFFER_CAPACITY"])
-    LEARNING_RATE = float(os.environ["LEARNING_RATE"])
-    BATCH_SIZE = int(os.environ["BATCH_SIZE"])
-    TRAINING_STEPS = int(os.environ["TRAINING_STEPS"])
-    GAMES_PER_ROUND = int(os.environ["NUM_CLIENTS"]) * int(os.environ["GAMES_PER_CLIENT"])
-    TRAINING_ROUNDS = int(os.environ["TRAINING_ROUNDS"])
-    DIM = 20
-except:
-    load_dotenv()
-    PORT = os.getenv("PORT")
-    BUFFER_CAPACITY = int(os.getenv("BUFFER_CAPACITY"))
-    LEARNING_RATE = float(os.getenv("LEARNING_RATE"))
-    BATCH_SIZE = int(os.getenv("BATCH_SIZE"))
-    TRAINING_STEPS = int(os.getenv("TRAINING_STEPS"))
-    GAMES_PER_ROUND = int(os.getenv("NUM_CLIENTS")) * int(os.getenv("GAMES_PER_CLIENT"))
-    TRAINING_ROUNDS = int(os.getenv("TRAINING_ROUNDS"))
-    DIM = 20 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
+# Load the .env file once if the script is not running in a Docker environment
+if not os.environ.get("DOCKER_ENV"):
+    load_dotenv()
+
+# Function to load environment variables
+def load_env_var(key, cast_type=str, default=None):
+    value = os.getenv(key, default)
+    
+    if not value:
+        logging.warning(f"Environment variable {key} not found, using default: {default}")
+        return default
+    
+    try:
+        return cast_type(value)
+    except ValueError:
+        logging.error(f"Error casting environment variable {key}. Using default: {default}")
+        return default
+        
+
+# Load environment variables
+PORT = load_env_var("PORT")
+BUFFER_CAPACITY = load_env_var("BUFFER_CAPACITY", int)
+LEARNING_RATE = load_env_var("LEARNING_RATE", float)
+BATCH_SIZE = load_env_var("BATCH_SIZE", int)
+TRAINING_STEPS = load_env_var("TRAINING_STEPS", int)
+NUM_CLIENTS = load_env_var("NUM_CLIENTS", int)
+GAMES_PER_CLIENT = load_env_var("GAMES_PER_CLIENT", int)
+GAMES_PER_ROUND = NUM_CLIENTS * GAMES_PER_CLIENT
+TRAINING_ROUNDS = load_env_var("TRAINING_ROUNDS", int)
+DIM = 20
+
+if None in [PORT, BUFFER_CAPACITY, LEARNING_RATE, BATCH_SIZE, TRAINING_STEPS, NUM_CLIENTS, GAMES_PER_CLIENT, TRAINING_ROUNDS]:
+    logging.error("One or more critical environment variables are missing.")
+    
 
 class BlokusModel(torch.nn.Module):
     """ML model that will predict policy and value for game states"""

@@ -8,14 +8,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - ${PORT}:${PORT}
-    environment:
-      PORT: ${PORT}
-      BUFFER_CAPACITY: ${BUFFER_CAPACITY}
-      LEARNING_RATE: ${LEARNING_RATE}
-      BATCH_SIZE: ${BATCH_SIZE}
-      TRAINING_STEPS: ${TRAINING_STEPS}
-      NUM_CLIENTS: ${NUM_CLIENTS}
-      TRAINING_ROUNDS: ${TRAINING_ROUNDS}
 
   self-play-client:
     env_file:
