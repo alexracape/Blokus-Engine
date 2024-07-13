@@ -24,6 +24,10 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap()
         .parse::<usize>()
         .unwrap();
+    let check_interval: u64 = env::var("CHECK_INTERVAL")
+        .unwrap()
+        .parse::<u64>()
+        .unwrap();
     let server_address = env::var("SERVER_URL").unwrap();
 
     // Connect to neural network
@@ -48,7 +52,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Wait for model to train
         println!("Waiting for model to train...");
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(check_interval)).await;
 
             let response = model.check(tonic::Request::new(Empty{})).await?;
             let current_round = response.into_inner().code as usize;
@@ -58,7 +62,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } 
         round += 1;
 
-    }
+    } 
 
     println!("Training complete!");
     Ok(())
