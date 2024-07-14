@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 import model_pb2
 import model_pb2_grpc
+from resnet import ResNet
 
 
 # Configure logging
@@ -45,58 +46,13 @@ NUM_CLIENTS = load_env_var("NUM_CLIENTS", int)
 GAMES_PER_CLIENT = load_env_var("GAMES_PER_CLIENT", int)
 GAMES_PER_ROUND = NUM_CLIENTS * GAMES_PER_CLIENT
 TRAINING_ROUNDS = load_env_var("TRAINING_ROUNDS", int)
+NN_WIDTH = load_env_var("NN_WIDTH", int, 256)
+NN_BLOCKS = load_env_var("NN_BLOCKS", int, 20)
 DIM = 20
 
 if None in [PORT, BUFFER_CAPACITY, LEARNING_RATE, BATCH_SIZE, TRAINING_STEPS, NUM_CLIENTS, GAMES_PER_CLIENT, TRAINING_ROUNDS]:
     logging.error("One or more critical environment variables are missing.")
     
-
-class BlokusModel(torch.nn.Module):
-    """ML model that will predict policy and value for game states"""
-
-    def __init__(self):
-        super(BlokusModel, self).__init__()
-
-        self.conv1 = Conv2d(5, 64, kernel_size=5, stride=1, padding=2)
-        self.conv2 = Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
-        self.conv3 = Conv2d(128, 1, kernel_size=3, stride=1, padding=1)
-
-        self.fc1 = Linear(DIM * DIM, 512)
-        self.fc2 = Linear(512, 256)
-
-        self.policy_head = Linear(256, 400)
-        self.value_head = Linear(256, 4)
-
-        self.relu = ReLU()
-
-    def forward(self, boards):
-        """Get the policy and value for the given board state
-
-        For now, the board is represented by a 20x20x5 tensor where the first 4 channels are
-        binary boards for each player's pieces on the board. The 5th channel is a binary board
-        with the valid moves for the current player. For now, I'm just going to use the boards.
-        It is unclear why the player color is needed in the state.
-        """
-        # print(board.shape)
-        x = self.relu(self.conv1(boards))
-        x = self.relu(self.conv2(x))
-        x = self.relu(self.conv3(x))
-
-        x = x.view(-1, DIM * DIM)
-        x = self.relu(self.fc1(x))
-        x = self.relu(self.fc2(x))
-
-        policy = self.policy_head(x)
-        value = self.value_head(x)
-
-        if len(boards.shape) == 3:
-            mask = boards[4].flatten()
-        else:
-            mask = boards[:, 4, :, :].view(boards.size(0), -1)
-        policy = policy * mask
-
-        return policy, value
-
 
 class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
     """Servicer for the Blokus model using gRPC
@@ -118,7 +74,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         if model_path:
             self.model = torch.load(model_path, map_location=self.device)
         else:
-            self.model = BlokusModel().to(self.device)
+            self.model = ResNet(NN_BLOCKS, NN_WIDTH).to(self.device)
 
         # summary(self.model, [(5, 20, 20), (1, 1, 1)]) # for some reason dimension when summarizing is (2, 5, 20, 20)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
