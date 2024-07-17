@@ -1,6 +1,10 @@
-from concurrent import futures
 import os
 import logging
+from concurrent.futures import ThreadPoolExecutor
+from concurrent import futures
+import threading
+import json
+
 
 import grpc
 import numpy as np
@@ -15,44 +19,44 @@ from resnet import ResNet
 
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 # Load the .env file once if the script is not running in a Docker environment
 if not os.environ.get("DOCKER_ENV"):
     load_dotenv()
 
 # Function to load environment variables
-def load_env_var(key, cast_type=str, default=None):
-    value = os.getenv(key, default)
-    
+def load_env_var(key, cast_type: type = str, default=None):
+
+    value = os.getenv(key)
     if not value:
-        logging.warning(f"Environment variable {key} not found, using default: {default}")
+        logging.warn(f"Environment variable {key} not found, using default: {default}")
         return default
-    
+
     try:
         return cast_type(value)
     except ValueError:
         logging.error(f"Error casting environment variable {key}. Using default: {default}")
         return default
-        
+
 
 # Load environment variables
 PORT = load_env_var("PORT")
-BUFFER_CAPACITY = load_env_var("BUFFER_CAPACITY", int)
-LEARNING_RATE = load_env_var("LEARNING_RATE", float)
+BUFFER_CAPACITY = load_env_var("BUFFER_CAPACITY", int, 1000)
+LEARNING_RATE = load_env_var("LEARNING_RATE", float, 0.001)
 BATCH_SIZE = load_env_var("BATCH_SIZE", int)
-TRAINING_STEPS = load_env_var("TRAINING_STEPS", int)
-NUM_CLIENTS = load_env_var("NUM_CLIENTS", int)
-GAMES_PER_CLIENT = load_env_var("GAMES_PER_CLIENT", int)
+TRAINING_STEPS = load_env_var("TRAINING_STEPS", int, 10)
+NUM_CLIENTS = load_env_var("NUM_CLIENTS", int, 1)
+GAMES_PER_CLIENT = load_env_var("GAMES_PER_CLIENT", int, 1)
 GAMES_PER_ROUND = NUM_CLIENTS * GAMES_PER_CLIENT
 TRAINING_ROUNDS = load_env_var("TRAINING_ROUNDS", int)
-NN_WIDTH = load_env_var("NN_WIDTH", int, 256)
-NN_BLOCKS = load_env_var("NN_BLOCKS", int, 20)
+NN_WIDTH = load_env_var("NN_WIDTH", int, 64)
+NN_BLOCKS = load_env_var("NN_BLOCKS", int, 2)
 DIM = 20
 
 if None in [PORT, BUFFER_CAPACITY, LEARNING_RATE, BATCH_SIZE, TRAINING_STEPS, NUM_CLIENTS, GAMES_PER_CLIENT, TRAINING_ROUNDS]:
     logging.error("One or more critical environment variables are missing.")
-    
+
 
 class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
     """Servicer for the Blokus model using gRPC
@@ -65,12 +69,16 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
     outcome of the game for each player.
     """
 
-    def __init__(self, model_path=None):
+    def __init__(self, condition, model_path=None):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.buffer = ReplayBuffer()
+        self.stats = []
+        self.executor = ThreadPoolExecutor(max_workers=1)
         self.training_round = 0
         self.num_saves = 0
+        self.condition = condition
+
         if model_path:
             self.model = torch.load(model_path, map_location=self.device)
         else:
@@ -83,7 +91,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
 
     def Predict(self, request, context):
         boards = np.array(request.boards).reshape(5, DIM, DIM)
-        boards = torch.tensor(boards, dtype=torch.float32).to(self.device)
+        boards = torch.tensor(boards, dtype=torch.float32).unsqueeze(0).to(self.device)
         player = request.player
 
         with torch.no_grad():
@@ -111,19 +119,17 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         # self.Train() # For testing
         self.num_saves += 1
         if self.num_saves == GAMES_PER_ROUND:
+            # self.executor.submit(self.Train)
             self.Train()
             self.num_saves = 0
-        if self.training_round == TRAINING_ROUNDS:
-            torch.save(self.model, "model.pt")
-
         return model_pb2.Status(code=0)
 
 
     def Train(self, batch_size=BATCH_SIZE, training_steps=TRAINING_STEPS):
         """Train the model using the data in the replay buffer"""
 
-        for _ in range(training_steps):
-            print("Training step: ", _)
+        for step in range(training_steps):
+            logging.info(f"Training step: {step}")
 
             # Get a batch of data from the replay buffer
             batch = self.buffer.sample(batch_size)
@@ -141,7 +147,33 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
             loss.backward()
             self.optimizer.step()
 
+            # Store training statistics
+            self.stats.append({
+                'training_round': self.training_round,
+                'step': step,
+                'policy_loss': policy_loss.item(),
+                'value_loss': value_loss.item(),
+                'total_loss': loss.item()
+            })
+
         self.training_round += 1
+        if self.training_round == TRAINING_ROUNDS:
+
+            # Save model
+            model_path = "./data/model.pt"
+            torch.save(self.model, model_path)
+            print("Model saved to: ", model_path)
+
+            # Save training stats
+            stats_path = "./data/training_stats.json"
+            with open(stats_path, 'w') as f:
+                json.dump(self.stats, f)
+                print("Training stats saved to: ", stats_path)
+
+            # Shutdown server
+            with self.condition:
+                self.condition.notify_all()
+
         return model_pb2.Status(code=0)
 
 
@@ -202,11 +234,18 @@ class ReplayBuffer:
 
 def serve():
     print("Starting up server...", flush=True)
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    model_pb2_grpc.add_BlokusModelServicer_to_server(BlokusModelServicer(), server)
+    condition = threading.Condition()
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=7))
+    model_pb2_grpc.add_BlokusModelServicer_to_server(BlokusModelServicer(condition), server)
     server.add_insecure_port(f"[::]:{PORT}")
     server.start()
-    server.wait_for_termination()
+
+    with condition:
+        condition.wait()
+    logging.info("Training complete, shutting down server...")
+    server.stop(0).wait()
+
+    # server.wait_for_termination()
 
 
 if __name__ == "__main__":
