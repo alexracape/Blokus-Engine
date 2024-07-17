@@ -134,8 +134,6 @@ impl Game {
             self.last_piece_lens[current_player] =
                 self.board.get_pieces(current_player).remove(*piece).points;
             self.board.use_piece(current_player, *piece);
-            self.board.print_board();
-            println!();
 
             // Advance to next player
             loop {
@@ -196,7 +194,12 @@ impl Game {
         self.legal_tiles.keys().map(|k| *k).collect()
     }
 
-    /// Player fewest tiles remaining wins
+    /// Get the scores for the end of the game
+    pub fn get_score(&self) -> Vec<i32> {
+        self.board.get_scores(self.last_piece_lens)
+    }
+
+    /// Player fewest tiles remaining wins, payoff is between 0 and 1
     pub fn get_payoff(&self) -> Vec<f32> {
         let scores = self.board.get_scores(self.last_piece_lens);
         let mut payoff = vec![0.0; 4];
@@ -216,7 +219,6 @@ impl Game {
             payoff[*i] = 1.0 / indices.len() as f32;
         }
 
-        println!("Scores: {:?}", scores);
         payoff
     }
 

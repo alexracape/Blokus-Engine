@@ -1,13 +1,14 @@
-
 services:
   model-server:
     env_file:
       - .env
-    build: 
+    build:
       context: model
       dockerfile: Dockerfile
     ports:
       - ${PORT}:${PORT}
+    volumes:
+      - ./model:/data
 
   self-play-client:
     env_file:
@@ -27,5 +28,8 @@ services:
         delay: 5s
         max_attempts: 3
         window: 10s
-      
 
+# networks:
+
+volumes:
+  model:

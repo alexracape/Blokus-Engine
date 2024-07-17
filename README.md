@@ -51,11 +51,12 @@ Gui:
 
 Self Play:
 
-- Add capability to record data from training rounds
-- ResNet Backbone for neural network
+- Integrate saving stats with docker volumes
+- Change buffer to dataloader for training
 
 Miscelaneous:
 
+- Docker is way slower than native for some reason
 - Benchmarks for testing performance
 - Is it worth refactoring the way pieces are structured
 

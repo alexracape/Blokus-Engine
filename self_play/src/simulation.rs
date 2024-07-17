@@ -306,7 +306,8 @@ pub async fn play_game(
 
     // game.board.print_board();
     Ok(format!(
-        "Game finished with payoff: {:?}",
-        game.get_payoff()
+        "Game finished with payoff: {:?} and score: {:?}",
+        game.get_payoff(),
+        game.get_score()
     ))
 }
