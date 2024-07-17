@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent import futures
 import threading
 import json
+import time
 
 
 import grpc
@@ -160,18 +161,20 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         if self.training_round == TRAINING_ROUNDS:
 
             # Save model
-            model_path = "./data/model.pt"
+            model_path = "data/model.pt"
             torch.save(self.model, model_path)
             print("Model saved to: ", model_path)
 
             # Save training stats
-            stats_path = "./data/training_stats.json"
+            stats_path = "data/training_stats.json"
             with open(stats_path, 'w') as f:
                 json.dump(self.stats, f)
                 print("Training stats saved to: ", stats_path)
 
             # Shutdown server
             with self.condition:
+                # Give clients time to finish
+                time.sleep(5)
                 self.condition.notify_all()
 
         return model_pb2.Status(code=0)

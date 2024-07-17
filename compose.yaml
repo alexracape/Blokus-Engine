@@ -7,8 +7,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - ${PORT}:${PORT}
-    volumes:
-      - ./model:/data
 
   self-play-client:
     env_file:
@@ -26,10 +24,5 @@ services:
       restart_policy:
         condition: on-failure
         delay: 5s
-        max_attempts: 3
+        max_attempts: 1
         window: 10s
-
-# networks:
-
-volumes:
-  model:
