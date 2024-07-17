@@ -5,10 +5,13 @@ FROM python:3.10-slim
 WORKDIR /server
 
 # Copy server code to the container
-COPY . . 
+COPY . .
 
 # Install the required packages
 RUN pip install -r requirements.txt
+
+# Make sure the data directory exists
+RUN mkdir -p /data
 
 # Expose the port for the server
 EXPOSE 8082
