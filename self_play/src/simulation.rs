@@ -11,6 +11,7 @@ use crate::grpc::Move;
 use crate::grpc::Policy;
 use crate::grpc::StateRepresentation;
 
+use indicatif::ProgressBar;
 use tonic::transport::Channel;
 
 use crate::node::Node;
@@ -270,13 +271,13 @@ pub async fn play_game(
     model: &mut BlokusModelClient<Channel>,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let config = Config::build();
+    let bar = ProgressBar::new(BOARD_SIZE as u64);
 
     // Run self-play to generate data
     let mut game = Game::reset();
     let mut policies: Vec<Policy> = Vec::new();
     while !game.is_terminal() {
         // Get MCTS policy for current state
-        // let mut policy = mcts(&game, &mut model).await?;
         let action = match mcts(&game, model, &mut policies, &config).await {
             Ok(a) => a,
             Err(e) => {
@@ -287,6 +288,7 @@ pub async fn play_game(
 
         // println!("Player {} --- {}", game.current_player(), action);
         let _ = game.apply(action);
+        bar.inc(1);
     }
 
     // Train the model
@@ -302,6 +304,7 @@ pub async fn play_game(
         policies: policies,
         values: game.get_payoff(),
     });
+    bar.finish();
     model.save(game_data).await?;
 
     // game.board.print_board();

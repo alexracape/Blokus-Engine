@@ -6,9 +6,9 @@ import threading
 import json
 import time
 
-
 import grpc
 import numpy as np
+import pandas as pd
 import torch
 from torch.nn import Linear, ReLU, Conv2d
 from torchsummary import summary
@@ -70,15 +70,14 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
     outcome of the game for each player.
     """
 
-    def __init__(self, condition, model_path=None):
+    def __init__(self, model_path=None):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.buffer = ReplayBuffer()
-        self.stats = []
+        self.stats = pd.DataFrame(columns=["round", "loss", "value_loss", "policy_loss", "buffer_size"])
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.training_round = 0
         self.num_saves = 0
-        self.condition = condition
 
         if model_path:
             self.model = torch.load(model_path, map_location=self.device)
@@ -97,7 +96,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
 
         with torch.no_grad():
             policy, values = self.model(boards)
-        print(values)
+        # print(values)
         return model_pb2.Target(policy=policy[0], value=values[0])
 
 
@@ -150,32 +149,16 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
 
             # Store training statistics
             self.stats.append({
-                'training_round': self.training_round,
-                'step': step,
-                'policy_loss': policy_loss.item(),
-                'value_loss': value_loss.item(),
-                'total_loss': loss.item()
+                "round": self.training_round,
+                "loss": loss.item(),
+                "value_loss": value_loss.item(),
+                "policy_loss": policy_loss.item(),
+                "buffer_size": len(self.buffer.buffer)
             })
+            self.stats.to_csv("data/training_stats.csv")
 
         self.training_round += 1
-        if self.training_round == TRAINING_ROUNDS:
-
-            # Save model
-            model_path = "data/model.pt"
-            torch.save(self.model, model_path)
-            print("Model saved to: ", model_path)
-
-            # Save training stats
-            stats_path = "data/training_stats.json"
-            with open(stats_path, 'w') as f:
-                json.dump(self.stats, f)
-                print("Training stats saved to: ", stats_path)
-
-            # Shutdown server
-            with self.condition:
-                # Give clients time to finish
-                time.sleep(5)
-                self.condition.notify_all()
+        self.model.save(f"models/model_{self.training_round}.pt")
 
         return model_pb2.Status(code=0)
 
@@ -237,18 +220,11 @@ class ReplayBuffer:
 
 def serve():
     print("Starting up server...", flush=True)
-    condition = threading.Condition()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=7))
-    model_pb2_grpc.add_BlokusModelServicer_to_server(BlokusModelServicer(condition), server)
+    model_pb2_grpc.add_BlokusModelServicer_to_server(BlokusModelServicer(), server)
     server.add_insecure_port(f"[::]:{PORT}")
     server.start()
-
-    with condition:
-        condition.wait()
-    logging.info("Training complete, shutting down server...")
-    server.stop(0).wait()
-
-    # server.wait_for_termination()
+    server.wait_for_termination()
 
 
 if __name__ == "__main__":

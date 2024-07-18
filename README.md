@@ -51,8 +51,8 @@ Gui:
 
 Self Play:
 
-- Integrate saving stats with docker volumes
 - Change buffer to dataloader for training
+- Can I batch requests from the clients
 
 Miscelaneous:
 
