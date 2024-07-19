@@ -11,7 +11,16 @@ To run server:
 To run simulation client:
 `cargo run --bin self_play`
 
+### Development
+
 Generate server code: `python -m grpc_tools.protoc -Iproto --python_out=./model --pyi_out=./model --grpc_python_out=./model ./proto/model.proto`
+
+### Docker
+
+To copy model X from the running server: `docker cp <container-id>:/server/models/model_X.pt /destination/path`
+
+To copy training data from the running server: `docker cp <container-id>:/server/data/training_stats.csv /destination/path`
+
 
 ## Configuration
 
@@ -20,24 +29,41 @@ All configuration is stored in the environment in the form of environment variab
 #### Example .env file:
 
 ```
-PORT=8000
-SERVER_URL=http://[::1]:8000
+PORT=8082
+SERVER_URL=http://[::1]:8082
+TRAINING_ROUNDS=1
 
-# Server
-BUFFER_CAPACITY=1000 # Games
-LEARNING_RATE=0.001  # Changes from 0.01 to 0.0001 for AlphaZero
-BATCH_SIZE=256       # 2048 for AlphaZero
-TRAINING_STEPS=10    # 700,000 for AlphaZero
+# -- Server --
+# In AlphaZero...
+# Learning rate changes from .01 to .0001 over time
+# Batch size is 2048
+# 700,000 training steps
+# ResNet had 20 blocks with 256 filters for each convolution
+BUFFER_CAPACITY=1000
+LEARNING_RATE=0.01
+BATCH_SIZE=128
+TRAINING_STEPS=10
+NN_WIDTH=32
+NN_BLOCKS=2
 
-# Client
+# -- Client --
+# In AlphaZero...
+# 5000 clients
+# 800 simulations per move
+# 30 sample moves
+# 19652 c_base
+# 1.25 c_init
+# 0.03 dirichlet_alpha
+# 0.25 exploration_frac
 NUM_CLIENTS=1
-GAMES_PER_CLIENT=1  # 21 million total games for Go in AlphaZero
-SIMS_PER_MOVE=10    # 800 for AlphaZero
-SAMPLE_MOVES=30     # 30 for AlphaZero
-C_BASE=19652        # 19652 for AlphaZero
-C_INIT=1.25         # 1.25 for AlphaZero
-DIRICHLET_ALPHA=0.3 # 0.03 for AlphaZero
-EXPLORATION_FRAC=0.25   # 0.25 for AlphaZero
+GAMES_PER_CLIENT=1
+SIMS_PER_MOVE=2
+SAMPLE_MOVES=30
+C_BASE=19652
+C_INIT=1.25
+DIRICHLET_ALPHA=0.3
+EXPLORATION_FRAC=0.25
+CHECK_INTERVAL=2
 ```
 
 ## On Tap:

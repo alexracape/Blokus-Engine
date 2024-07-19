@@ -73,6 +73,8 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
     def __init__(self, model_path=None):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        logging.info(f"Using device: {self.device}")
+
         self.buffer = ReplayBuffer()
         self.stats = pd.DataFrame(columns=["round", "loss", "value_loss", "policy_loss", "buffer_size"])
         self.executor = ThreadPoolExecutor(max_workers=1)
@@ -148,17 +150,18 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
             self.optimizer.step()
 
             # Store training statistics
-            self.stats.append({
+            row = pd.DataFrame([{
                 "round": self.training_round,
                 "loss": loss.item(),
                 "value_loss": value_loss.item(),
                 "policy_loss": policy_loss.item(),
                 "buffer_size": len(self.buffer.buffer)
-            })
-            self.stats.to_csv("data/training_stats.csv")
+            }])
+            self.stats = pd.concat([self.stats, row])
+            self.stats.to_csv("./data/training_stats.csv")
 
+        torch.save(self.model, f"./models/model_{self.training_round}.pt")
         self.training_round += 1
-        self.model.save(f"models/model_{self.training_round}.pt")
 
         return model_pb2.Status(code=0)
 
@@ -219,7 +222,18 @@ class ReplayBuffer:
 
 
 def serve():
-    print("Starting up server...", flush=True)
+    logging.info("Starting up server...")
+    logging.debug(f"ENV VARS:\n"
+                  f"PORT: {PORT}\n"
+                  f"BUFFER_CAPACITY: {BUFFER_CAPACITY}\n"
+                  f"LEARNING_RATE: {LEARNING_RATE}\n"
+                  f"BATCH_SIZE: {BATCH_SIZE}\n"
+                  f"TRAINING_STEPS: {TRAINING_STEPS}\n"
+                  f"TRAINING_ROUNDS: {TRAINING_ROUNDS}\n"
+                  f"NUM_CLIENTS: {NUM_CLIENTS}\n"
+                  f"GAMES_PER_ROUND: {GAMES_PER_ROUND}\n"
+                  f"WIDTH: {NN_WIDTH}\n"
+                  f"BLOCKS: {NN_BLOCKS}\n")
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=7))
     model_pb2_grpc.add_BlokusModelServicer_to_server(BlokusModelServicer(), server)
     server.add_insecure_port(f"[::]:{PORT}")

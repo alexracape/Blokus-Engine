@@ -7,14 +7,21 @@ services:
       dockerfile: Dockerfile
     ports:
       - ${PORT}:${PORT}
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost $${PORT}"]
+      interval: 5s
+      timeout: 2s
+      retries: 3
 
   self-play-client:
     env_file:
       - .env
     build:
+      context: .
       dockerfile: Dockerfile
     depends_on:
-      - model-server
+      model-server:
+        condition: service_healthy
     environment:
       GAMES_PER_CLIENT: ${GAMES_PER_CLIENT}
       TRAINING_ROUNDS: ${TRAINING_ROUNDS}
@@ -26,3 +33,4 @@ services:
         delay: 5s
         max_attempts: 1
         window: 10s
+    tty: true
