@@ -10,8 +10,12 @@ COPY . .
 # Install the required packages
 RUN pip install -r requirements.txt
 
+# Install netcat for health check
+RUN apt-get update && apt-get install -y netcat-openbsd
+
 # Make sure the data directory exists
-RUN mkdir -p /data
+RUN mkdir -p data
+RUN mkdir -p models
 
 # Expose the port for the server
 EXPOSE 8082
