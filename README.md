@@ -13,9 +13,11 @@ To run simulation client:
 
 ### Development
 
-Generate server code: `python -m grpc_tools.protoc -Iproto --python_out=./model --pyi_out=./model --grpc_python_out=./model ./proto/model.proto`
+To generate server gRPC code: `python -m grpc_tools.protoc -Iproto --python_out=./model --pyi_out=./model --grpc_python_out=./model ./proto/model.proto`
 
 ### Docker
+
+To train the model using docker: `docker compose up`
 
 To copy model X from the running server: `docker cp <container-id>:/server/models/model_X.pt /destination/path`
 
@@ -24,7 +26,7 @@ To copy training data from the running server: `docker cp <container-id>:/server
 
 ## Configuration
 
-All configuration is stored in the environment in the form of environment variables. This follows the [12 factor app](https://12factor.net/config) methodology, and an example env file is provided in the root of the project.
+All configuration is stored in the environment in the form of environment variables. This follows the [12 factor app](https://12factor.net/config) methodology, and an example env file is provided below.
 
 #### Example .env file:
 
@@ -65,32 +67,6 @@ DIRICHLET_ALPHA=0.3
 EXPLORATION_FRAC=0.25
 CHECK_INTERVAL=2
 ```
-
-## On Tap:
-
-Gui:
-
-- Fix basic functionality
-- Add undo
-- Figure out how to connect to model
-- Elegant way to handle terminal states
-
-Self Play:
-
-- Change buffer to dataloader for training
-- Can I batch requests from the clients
-
-Miscelaneous:
-
-- Docker is way slower than native for some reason
-- Benchmarks for testing performance
-- Is it worth refactoring the way pieces are structured
-
-Questions:
-
-- What does it mean for the staet to be oriented to the current player? Should I shuffle the order of the boards to match,
-  or should I just keep track of the current player and rotate the board accordingly?
-- Should I pass in remaining pieces for the hard coded filters or something? Shouldn't the model be able to figure that out?
 
 ## References
 
