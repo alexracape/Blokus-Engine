@@ -1,4 +1,5 @@
 # Blokus Engine
+![blokus_ai](https://github.com/user-attachments/assets/17912e07-bb01-4b64-8e1d-c9ee468c1117)
 
 ## Usage:
 
