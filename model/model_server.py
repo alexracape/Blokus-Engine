@@ -2,6 +2,7 @@ import os
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from concurrent import futures
+from typing import List, Tuple, Dict
 import threading
 import json
 import time
@@ -11,6 +12,8 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.nn import Linear, ReLU, Conv2d
+from torchrl.data import ReplayBuffer, ListStorage
+from torchrl.data.replay_buffers import Sampler
 from torchsummary import summary
 from dotenv import load_dotenv
 
@@ -75,7 +78,11 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logging.info(f"Using device: {self.device}")
 
-        self.buffer = ReplayBuffer()
+        self.buffer = ReplayBuffer(
+            storage=ListStorage(BUFFER_CAPACITY),
+            batch_size=BATCH_SIZE,
+            sampler=MoveSampler()
+        )
         self.stats = pd.DataFrame(columns=["round", "loss", "value_loss", "policy_loss", "buffer_size"])
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.training_round = 0
@@ -116,8 +123,8 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
     def Save(self, request, context):
         """Store data in the replay buffer"""
 
-        self.buffer.add(request.history, request.policies, request.values)
-        print("Buffer size: ", len(self.buffer.buffer))
+        self.buffer.add([request.history, request.policies, request.values])
+        print("Buffer size: ", len(self.buffer))
         # self.Train() # For testing
         self.num_saves += 1
         if self.num_saves == GAMES_PER_ROUND:
@@ -166,20 +173,47 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         return model_pb2.Status(code=0)
 
 
-class ReplayBuffer:
+class MoveSampler(Sampler):
+    """Sample moves from the replay buffer
+
+    Builds targets dynamically using the history stored
+    in the replay buffer.
+    """
+
+    def sample(self, storage, batch_size) -> Tuple[torch.Tensor, Dict]:
+        """Get game indices for the batch to sample from the storage"""
+
+        total_moves = sum([len(game[0]) for game in storage])
+        weights = [len(game[0]) / total_moves for game in storage]
+        indices = torch.multinomial(torch.tensor(weights), batch_size, replacement=True)
+        return indices, {}
+
+    def build_target(self, history, policies, values):
+        """Build the target for the model"""
+
+        # Get random move from the game
+        i = np.random.randint(len(history))
+
+        # Get key data from the game
+        state = torch.zeros(5, DIM, DIM)
+        for move in history[:i]:
+            state = state + move
+        policy = policies[i]
+        value = values[i]
+
+        return state, policy, value
+
+
+class BlokusReplayBuffer(ReplayBuffer):
     """Buffer for storing game states for training the model"""
 
-    def __init__(self, capacity=BUFFER_CAPACITY):
-        self.capacity = capacity
-        self.buffer = []
+    def __init__(self):
+        super().__init__()
         self.total_moves = 0
 
-    def add(self, history, policies, values):
-        if len(self.buffer) >= self.capacity:
-            old = self.buffer.pop(0)
-            self.total_moves -= len(old[0])
-        self.buffer.append((history, policies, values))
+    def push(self, history, policies, values):
         self.total_moves += len(history)
+        super().add([history, policies, values])
 
     def sample(self, batch_size):
         weights = [len(game[0]) / self.total_moves for game in self.buffer]
