@@ -2,7 +2,7 @@ import os
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from concurrent import futures
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Any
 import threading
 import json
 import time
@@ -78,7 +78,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logging.info(f"Using device: {self.device}")
 
-        self.buffer = ReplayBuffer(
+        self.buffer = BlokusBuffer(
             storage=ListStorage(BUFFER_CAPACITY),
             batch_size=BATCH_SIZE,
             sampler=MoveSampler()
@@ -99,8 +99,8 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         self.value_loss = torch.nn.MSELoss().to(self.device)
 
     def Predict(self, request, context):
-        boards = np.array(request.boards).reshape(5, DIM, DIM)
-        boards = torch.tensor(boards, dtype=torch.float32).unsqueeze(0).to(self.device)
+        # boards = np.array(request.boards).reshape(5, DIM, DIM)
+        boards = torch.tensor(request.boards, dtype=torch.float32).reshape(5, DIM, DIM).unsqueeze(0).to(self.device)
         player = request.player
 
         with torch.no_grad():
@@ -134,14 +134,14 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         return model_pb2.Status(code=0)
 
 
-    def Train(self, batch_size=BATCH_SIZE, training_steps=TRAINING_STEPS):
+    def Train(self, training_steps=TRAINING_STEPS):
         """Train the model using the data in the replay buffer"""
 
         for step in range(training_steps):
             logging.info(f"Training step: {step}")
 
             # Get a batch of data from the replay buffer
-            batch = self.buffer.sample(batch_size)
+            batch = self.buffer.get_batch()
             inputs, policies, values = zip(*batch)
             inputs = torch.stack(inputs).to(self.device)
             policies = torch.stack(policies).to(self.device)
@@ -162,7 +162,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
                 "loss": loss.item(),
                 "value_loss": value_loss.item(),
                 "policy_loss": policy_loss.item(),
-                "buffer_size": len(self.buffer.buffer)
+                "buffer_size": len(self.buffer)
             }])
             self.stats = pd.concat([self.stats, row])
             self.stats.to_csv("./data/training_stats.csv")
@@ -188,69 +188,56 @@ class MoveSampler(Sampler):
         indices = torch.multinomial(torch.tensor(weights), batch_size, replacement=True)
         return indices, {}
 
-    def build_target(self, history, policies, values):
-        """Build the target for the model"""
+    def _empty(self):
+        pass
+
+    def state_dict(self) -> Dict[str, Any]:
+        return {}
+
+    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
+        return
+
+    def dumps(self, path):
+        pass
+
+    def loads(self, path):
+        pass
+
+
+class BlokusBuffer(ReplayBuffer):
+    """Buffer for storing game states for training the model"""
+
+    def get_batch(self):
+        """Sample buffer for training"""
+
+        games = self.sample()
+        batch = [self.build_targets(*game) for game in games]
+        return batch
+
+    def build_targets(self, history, policies, values):
+        """Create training data from a game"""
 
         # Get random move from the game
         i = np.random.randint(len(history))
 
         # Get key data from the game
-        state = torch.zeros(5, DIM, DIM)
+        state = torch.zeros(5, DIM, DIM, dtype=torch.bool)
         for move in history[:i]:
-            state = state + move
-        policy = policies[i]
-        value = values[i]
-
-        return state, policy, value
-
-
-class BlokusReplayBuffer(ReplayBuffer):
-    """Buffer for storing game states for training the model"""
-
-    def __init__(self):
-        super().__init__()
-        self.total_moves = 0
-
-    def push(self, history, policies, values):
-        self.total_moves += len(history)
-        super().add([history, policies, values])
-
-    def sample(self, batch_size):
-        weights = [len(game[0]) / self.total_moves for game in self.buffer]
-        games = np.random.choice(len(self.buffer), batch_size, p=weights)
-        return [self.training_data(self.buffer[i]) for i in games]
-
-    def training_data(self, game):
-
-        # Get random move from the game
-        i = np.random.randint(len(game[0]))
-
-        # Get key data from the game
-        history, policies, values = game
-        state = torch.zeros(5, DIM, DIM, dtype=torch.float32)
-        policy = torch.zeros(DIM * DIM, dtype=torch.float32)
-        values = torch.tensor(values, dtype=torch.float32)
-
-        # Reconstruct state representation
-        for j in range(i):
-            player, tile = history[j].player, history[j].tile
+            player, tile = move.player, move.tile
             row, col = tile // DIM, tile % DIM
-            state[player, row, col] = True
+            state[player, row, col] = True # TODO is this oriented to the current player correctly?
 
-        # reconstruct policy representation
+        policy = torch.zeros(DIM * DIM, dtype=torch.float32)
         for action in policies[i].probs:
             tile, prob = action.action, action.prob
             policy[tile] = prob
 
-        # Apply random transform for data augmentation to both state and policy
-        horizontal = np.random.choice([True, False])
-        vertical = np.random.choice([True, False])
-        if horizontal:
-            state = state.flip(0)
-            policy = policy.view(DIM, DIM).flip(0).flatten()
-        if vertical:
-            state = state.flip(1)
-            policy = policy.view(DIM, DIM).flip(1).flatten()
+        # Data augmentation - flip board either horizontally or vertically
+        flip_axes = [0, 1]
+        for axis in flip_axes:
+            if np.random.choice([True, False]):
+                state = state.flip(axis)
+                policy = policy.view(DIM, DIM).flip(axis).flatten()
 
         return state, policy, values
 
