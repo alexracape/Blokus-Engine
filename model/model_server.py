@@ -12,8 +12,9 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.nn import Linear, ReLU, Conv2d
-from torchrl.data import ReplayBuffer, ListStorage
+from torchrl.data import ReplayBuffer, LazyTensorStorage
 from torchrl.data.replay_buffers import Sampler
+from tensordict import tensorclass
 from torchsummary import summary
 from dotenv import load_dotenv
 
@@ -78,10 +79,9 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logging.info(f"Using device: {self.device}")
 
-        self.buffer = BlokusBuffer(
-            storage=ListStorage(BUFFER_CAPACITY),
-            batch_size=BATCH_SIZE,
-            sampler=MoveSampler()
+        self.buffer = ReplayBuffer(
+            storage=LazyTensorStorage(BUFFER_CAPACITY),
+            batch_size=BATCH_SIZE
         )
         self.stats = pd.DataFrame(columns=["round", "loss", "value_loss", "policy_loss", "buffer_size"])
         self.executor = ThreadPoolExecutor(max_workers=1)
@@ -123,14 +123,39 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
     def Save(self, request, context):
         """Store data in the replay buffer"""
 
-        self.buffer.add([request.history, request.policies, request.values])
+        # Allocate space for the data
+        num_moves = len(request.history)
+        states = torch.zeros(num_moves, 5, DIM, DIM, dtype=torch.float32)
+        policies = torch.zeros(num_moves, DIM * DIM, dtype=torch.float32)
+        scores = torch.tensor(request.values, dtype=torch.float32).repeat(num_moves, 1)
+
+        # For each move from this game, update the state and policy
+        for i, (move, policy) in enumerate(zip(request.history, request.policies)):
+            player, tile = move.player, move.tile
+            row, col = tile // DIM, tile % DIM
+            states[i, player, row, col] = 1
+
+            # Update the policy for this move
+            for element in policy.probs:
+                action, prob = element.action, element.prob
+                policies[i, action] = prob
+
+        data = Data(
+            states = states,
+            policies = policies,
+            scores = scores,
+            batch_size = [num_moves]
+        )
+        self.buffer.extend(data)
         print("Buffer size: ", len(self.buffer))
-        # self.Train() # For testing
+
+        # Save the model after every round of training
         self.num_saves += 1
         if self.num_saves == GAMES_PER_ROUND:
             # self.executor.submit(self.Train)
             self.Train()
             self.num_saves = 0
+
         return model_pb2.Status(code=0)
 
 
@@ -141,11 +166,10 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
             logging.info(f"Training step: {step}")
 
             # Get a batch of data from the replay buffer
-            batch = self.buffer.get_batch()
-            inputs, policies, values = zip(*batch)
-            inputs = torch.stack(inputs).to(self.device)
-            policies = torch.stack(policies).to(self.device)
-            values = torch.stack(values).to(self.device)
+            batch = self.buffer.sample()
+            inputs = batch.get("states").to(self.device)
+            policies = batch.get("policies").to(self.device)
+            values = batch.get("scores").to(self.device)
 
             # Train the model
             self.optimizer.zero_grad()
@@ -164,13 +188,23 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
                 "policy_loss": policy_loss.item(),
                 "buffer_size": len(self.buffer)
             }])
-            self.stats = pd.concat([self.stats, row])
+            if self.stats.empty:
+                self.stats = row
+            else:
+                self.stats = pd.concat([self.stats, row])
             self.stats.to_csv("./data/training_stats.csv")
 
         torch.save(self.model, f"./models/model_{self.training_round}.pt")
         self.training_round += 1
 
         return model_pb2.Status(code=0)
+
+
+@tensorclass
+class Data:
+    states: torch.Tensor
+    policies: torch.Tensor
+    scores: torch.Tensor
 
 
 class MoveSampler(Sampler):
@@ -226,11 +260,13 @@ class BlokusBuffer(ReplayBuffer):
             player, tile = move.player, move.tile
             row, col = tile // DIM, tile % DIM
             state[player, row, col] = True # TODO is this oriented to the current player correctly?
+            # Also doesn't update the 5th channel
 
         policy = torch.zeros(DIM * DIM, dtype=torch.float32)
         for action in policies[i].probs:
             tile, prob = action.action, action.prob
             policy[tile] = prob
+            # Can update legal moves here
 
         # Data augmentation - flip board either horizontally or vertically
         flip_axes = [0, 1]
