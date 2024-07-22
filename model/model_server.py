@@ -63,6 +63,13 @@ if None in [PORT, BUFFER_CAPACITY, LEARNING_RATE, BATCH_SIZE, TRAINING_STEPS, NU
     logging.error("One or more critical environment variables are missing.")
 
 
+@tensorclass
+class Data:
+    states: torch.Tensor
+    policies: torch.Tensor
+    scores: torch.Tensor
+
+
 class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
     """Servicer for the Blokus model using gRPC
 
@@ -140,6 +147,10 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
                 action, prob = element.action, element.prob
                 policies[i, action] = prob
 
+                # Update which squares are legal on this move
+                row, col = action // DIM, action % DIM
+                states[i, 4, row, col] = 1
+
         data = Data(
             states = states,
             policies = policies,
@@ -198,84 +209,6 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         self.training_round += 1
 
         return model_pb2.Status(code=0)
-
-
-@tensorclass
-class Data:
-    states: torch.Tensor
-    policies: torch.Tensor
-    scores: torch.Tensor
-
-
-class MoveSampler(Sampler):
-    """Sample moves from the replay buffer
-
-    Builds targets dynamically using the history stored
-    in the replay buffer.
-    """
-
-    def sample(self, storage, batch_size) -> Tuple[torch.Tensor, Dict]:
-        """Get game indices for the batch to sample from the storage"""
-
-        total_moves = sum([len(game[0]) for game in storage])
-        weights = [len(game[0]) / total_moves for game in storage]
-        indices = torch.multinomial(torch.tensor(weights), batch_size, replacement=True)
-        return indices, {}
-
-    def _empty(self):
-        pass
-
-    def state_dict(self) -> Dict[str, Any]:
-        return {}
-
-    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
-        return
-
-    def dumps(self, path):
-        pass
-
-    def loads(self, path):
-        pass
-
-
-class BlokusBuffer(ReplayBuffer):
-    """Buffer for storing game states for training the model"""
-
-    def get_batch(self):
-        """Sample buffer for training"""
-
-        games = self.sample()
-        batch = [self.build_targets(*game) for game in games]
-        return batch
-
-    def build_targets(self, history, policies, values):
-        """Create training data from a game"""
-
-        # Get random move from the game
-        i = np.random.randint(len(history))
-
-        # Get key data from the game
-        state = torch.zeros(5, DIM, DIM, dtype=torch.bool)
-        for move in history[:i]:
-            player, tile = move.player, move.tile
-            row, col = tile // DIM, tile % DIM
-            state[player, row, col] = True # TODO is this oriented to the current player correctly?
-            # Also doesn't update the 5th channel
-
-        policy = torch.zeros(DIM * DIM, dtype=torch.float32)
-        for action in policies[i].probs:
-            tile, prob = action.action, action.prob
-            policy[tile] = prob
-            # Can update legal moves here
-
-        # Data augmentation - flip board either horizontally or vertically
-        flip_axes = [0, 1]
-        for axis in flip_axes:
-            if np.random.choice([True, False]):
-                state = state.flip(axis)
-                policy = policy.view(DIM, DIM).flip(axis).flatten()
-
-        return state, policy, values
 
 
 def serve():
