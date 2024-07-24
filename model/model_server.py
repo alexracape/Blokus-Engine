@@ -1,7 +1,7 @@
 import os
 import logging
-from concurrent.futures import ThreadPoolExecutor
 from concurrent import futures
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple, Dict, Any
 import threading
 import json
@@ -50,6 +50,7 @@ PORT = load_env_var("PORT")
 BUFFER_CAPACITY = load_env_var("BUFFER_CAPACITY", int, 1000)
 LEARNING_RATE = load_env_var("LEARNING_RATE", float, 0.001)
 BATCH_SIZE = load_env_var("BATCH_SIZE", int)
+BATCHING_FREQUENCY = load_env_var("BATCHING_FREQUENCY", float, .01)
 TRAINING_STEPS = load_env_var("TRAINING_STEPS", int, 10)
 NUM_CLIENTS = load_env_var("NUM_CLIENTS", int, 1)
 GAMES_PER_CLIENT = load_env_var("GAMES_PER_CLIENT", int, 1)
@@ -81,39 +82,104 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
     outcome of the game for each player.
     """
 
-    def __init__(self, model_path=None):
+    def __init__(self, model_path=None, batch_duration=0.01):
+        """Create the model server
 
+        Args:
+            model_path (str): Path to a saved model to load
+            batch_duration (float): Duration to wait before processing batches during self-play
+        """
+
+        # Set the device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logging.info(f"Using device: {self.device}")
 
-        self.buffer = ReplayBuffer(
-            storage=LazyTensorStorage(BUFFER_CAPACITY),
-            batch_size=BATCH_SIZE
-        )
-        self.stats = pd.DataFrame(columns=["round", "loss", "value_loss", "policy_loss", "buffer_size"])
-        self.executor = ThreadPoolExecutor(max_workers=1)
-        self.training_round = 0
-        self.num_saves = 0
-
+        # Load or create the model
         if model_path:
             self.model = torch.load(model_path, map_location=self.device)
         else:
             self.model = ResNet(NN_BLOCKS, NN_WIDTH).to(self.device)
 
-        # summary(self.model, [(5, 20, 20), (1, 1, 1)]) # for some reason dimension when summarizing is (2, 5, 20, 20)
+        # Set up the optimizer and loss functions
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
         self.policy_loss = torch.nn.CrossEntropyLoss().to(self.device)
         self.value_loss = torch.nn.MSELoss().to(self.device)
 
-    def Predict(self, request, context):
-        # boards = np.array(request.boards).reshape(5, DIM, DIM)
-        boards = torch.tensor(request.boards, dtype=torch.float32).reshape(5, DIM, DIM).unsqueeze(0).to(self.device)
-        player = request.player
+        # Set up the replay buffer and stats to be stored
+        self.buffer = ReplayBuffer(
+            storage=LazyTensorStorage(BUFFER_CAPACITY),
+            batch_size=BATCH_SIZE
+        )
 
-        with torch.no_grad():
-            policy, values = self.model(boards)
-        # print(values)
-        return model_pb2.Target(policy=policy[0], value=values[0])
+        # Important state while training
+        self.stats = pd.DataFrame(columns=["round", "loss", "value_loss", "policy_loss", "buffer_size"])
+        self.training_round = 0
+        self.num_saves = 0
+
+        # Set up threading for batching client requests during self-play
+        self.self_playing = True
+        self.lock = threading.Lock()
+        self.requests = []
+        self.responses = []
+        self.batch_duration = batch_duration
+        self.processing_thread = None
+        self.start_processing()
+
+
+    def start_processing(self):
+        """Start threading for processing self-play batches"""
+        self.self_playing = True
+        self.processing_thread = threading.Thread(target=self.process_batches)
+        self.processing_thread.start()
+
+    def stop_processing(self):
+        """Clean up threading for processing self-play batches"""
+        self.self_playing = False
+        if self.processing_thread and self.processing_thread.is_alive():
+            self.processing_thread.join()
+
+
+    def process_batches(self):
+        """Periodically process the batches of data from the clients"""
+
+        while self.self_playing:
+            time.sleep(self.batch_duration)
+
+            # Acquire the lock and get the batch of requests
+            with self.lock:
+                if not self.requests:
+                    continue
+                batch, = zip(*self.requests)
+                response_futures = self.responses
+                self.requests = []
+                self.responses = []
+
+            # Query the model
+            with torch.no_grad():
+                policies, values = self.model(batch)
+
+            # Set the responses for each request
+            for i, response_future in enumerate(response_futures):
+                response = model_pb2.Target(policy=policies[i], value=values[i])
+                response_future.result = response
+                response_future.set()
+
+
+    def Predict(self, request, context):
+        boards = torch.tensor(request.boards, dtype=torch.float32).reshape(5, DIM, DIM).unsqueeze(0).to(self.device)
+        player = request.player  # Not used yet
+
+        with self.lock:
+            self.requests.append(boards)
+
+            # Hold the current thread until the response is ready
+            response_future = threading.Event()
+            self.responses.append(response_future)
+
+        # Wait for the batch processing thread to handle this request
+        response_future.wait()
+        assert hasattr(response_future, "result"), "Response future was not set"
+        return response_future.result
 
 
     def Check(self, request, context):
@@ -163,7 +229,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         # Save the model after every round of training
         self.num_saves += 1
         if self.num_saves == GAMES_PER_ROUND:
-            # self.executor.submit(self.Train)
+            self.stop_processing()
             self.Train()
             self.num_saves = 0
 
@@ -207,6 +273,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
 
         torch.save(self.model, f"./models/model_{self.training_round}.pt")
         self.training_round += 1
+        self.start_processing()
 
         return model_pb2.Status(code=0)
 
