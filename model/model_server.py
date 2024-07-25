@@ -149,7 +149,8 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
             with self.lock:
                 if not self.requests:
                     continue
-                batch, = zip(*self.requests)
+
+                batch = torch.stack(self.requests)
                 response_futures = self.responses
                 self.requests = []
                 self.responses = []
@@ -166,7 +167,7 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
 
 
     def Predict(self, request, context):
-        boards = torch.tensor(request.boards, dtype=torch.float32).reshape(5, DIM, DIM).unsqueeze(0).to(self.device)
+        boards = torch.tensor(request.boards, dtype=torch.float32).reshape(5, DIM, DIM).to(self.device)
         player = request.player  # Not used yet
 
         with self.lock:
@@ -289,6 +290,7 @@ def serve():
                   f"TRAINING_ROUNDS: {TRAINING_ROUNDS}\n"
                   f"NUM_CLIENTS: {NUM_CLIENTS}\n"
                   f"GAMES_PER_ROUND: {GAMES_PER_ROUND}\n"
+                  f"BATCHING_FREQUENCY: {BATCHING_FREQUENCY}\n"
                   f"WIDTH: {NN_WIDTH}\n"
                   f"BLOCKS: {NN_BLOCKS}\n")
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=7))
