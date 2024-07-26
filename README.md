@@ -1,5 +1,4 @@
 # Blokus Engine
-![blokus_ai](https://github.com/user-attachments/assets/17912e07-bb01-4b64-8e1d-c9ee468c1117)
 
 ![blokus_ai](https://github.com/user-attachments/assets/b0e97f83-328a-4218-b4cf-80c7819ab331)
 
