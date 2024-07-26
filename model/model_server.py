@@ -299,7 +299,7 @@ def serve():
                   f"BATCHING_FREQUENCY: {BATCHING_FREQUENCY}\n"
                   f"WIDTH: {NN_WIDTH}\n"
                   f"BLOCKS: {NN_BLOCKS}\n")
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=7))
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=8))
     model_pb2_grpc.add_BlokusModelServicer_to_server(BlokusModelServicer(), server)
     server.add_insecure_port(f"[::]:{PORT}")
     server.start()
