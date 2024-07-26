@@ -98,6 +98,7 @@ async fn evaluate(
     let prediction = model.predict(request).await?.into_inner();
     let policy = prediction.policy;
     let value = prediction.value;
+    let current_player = game.current_player().unwrap();
 
     // Normalize policy for node priors, filter out illegal moves
     let exp_policy: Vec<(usize, f32)> = policy
@@ -114,11 +115,16 @@ async fn evaluate(
     let total: f32 = exp_policy.iter().map(|(_, p)| p).sum();
 
     // Expand the node with the policy
-    node.to_play = game.current_player().unwrap();
+    node.to_play = current_player;
     for (tile, prob) in exp_policy {
         node.children.insert(tile, Node::new(prob / total));
     }
 
+    // Reorient the values so they are in order: player 0, player 1, player 2, player 3
+    let mut values = vec![0.0; 4];
+    for i in 0..4 {
+        values[(4 + i - current_player) % 4] = value[i];
+    }
     Ok(value)
 }
 
