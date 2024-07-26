@@ -34,11 +34,12 @@ Here
 | --- | --- | --- |
 | PORT | The port the server listens on |  |
 | SERVER_URL | The URL of the server | |
+| CHECK_INTERVAL | The time clients should wait before checking whether the server is still training |  |
+| BATCHING_FREQUENCY | The frequency batched requests are processed during self-play |  |
 | TRAINING_ROUNDS | The number of training rounds to run | 4,200 |
 | BUFFER_CAPACITY | The number of data points to store in the replay buffer | 1,000,000 games |
 | LEARNING_RATE | The learning rate of the neural network | .01 -> .0001 with scheduler |
 | BATCH_SIZE | The number of data points per batch | 2048 |
-| BATCHING_FREQUENCY | The frequency batched requests are processed during self-play |  |
 | TRAINING_STEPS | The number of training steps to run each round | 700,000 |
 | NN_WIDTH | The number of filters in each convolutional layer | 256 |
 | NN_BLOCKS | The number of residual blocks in the neural network | 20 |
@@ -50,7 +51,7 @@ Here
 | C_INIT | Constant for UCB formula to balance exploration and exploitation | 1.25 |
 | DIRICHLET_ALPHA | The alpha parameter of the Dirichlet distribution which adds noise to the root node during MCTS to promote exploration | 0.03 |
 | EXPLORATION_FRAC | Fraction used to mix noise and prior probability | 0.25 |
-| CHECK_INTERVAL | The time clients should wait before checking whether the server is still training |  |
+
 
 
 #### Example .env file:
