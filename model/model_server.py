@@ -204,10 +204,16 @@ class BlokusModelServicer(model_pb2_grpc.BlokusModelServicer):
         scores = torch.tensor(request.values, dtype=torch.float32).repeat(num_moves, 1)
 
         # For each move from this game, update the state and policy
+        new_state = torch.zeros(5, DIM, DIM, dtype=torch.float32)
         for i, (move, policy) in enumerate(zip(request.history, request.policies)):
+
+            # Keep running track of state in new_state
             player, tile = move.player, move.tile
             row, col = tile // DIM, tile % DIM
-            states[i, player, row, col] = 1
+            new_state[player, row, col] = 1
+
+            # Shift the state to the correct player's perspective
+            states[i] = torch.cat((new_state[player:], new_state[:player]), dim=0)
 
             # Update the policy for this move
             for element in policy.probs:
