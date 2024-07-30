@@ -16,8 +16,8 @@ impl GameState {
         GameState(Game::reset())
     }
 
-    pub fn apply(&mut self, tile: usize) -> Result<(), String> {
-        self.0.apply(tile)
+    pub fn apply(&mut self, tile: usize, piece_to_finish: Option<usize>) -> Result<(), String> {
+        self.0.apply(tile, piece_to_finish)
     }
 
     pub fn current_player(&self) -> Option<usize> {
@@ -70,9 +70,17 @@ impl Reducible for GameState {
                 }
 
                 // Break move into tiles and apply individually
-                for tile_offset in piece.offsets.iter() {
-                    let tile = o + tile_offset;
-                    if let Err(e) = new_state.apply(tile) {
+                let offsets = piece.offsets.iter().collect::<Vec<_>>();
+                let last_index = offsets.len().saturating_sub(1);
+                for (i, tile_offset) in offsets.iter().enumerate() {
+                    let tile = o + *tile_offset;
+                    let result = if i == last_index {
+                        new_state.apply(tile, Some(p))
+                    } else {
+                        new_state.apply(tile, None)
+                    };
+
+                    if let Err(e) = result {
                         console::log!("Error applying move: {}", e);
                         return self.into();
                     }
