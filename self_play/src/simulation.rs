@@ -238,7 +238,7 @@ async fn mcts(
         while node.is_expanded() {
             let action = select_child(node, config);
             node = node.children.get_mut(&action).unwrap();
-            let _ = scratch_game.apply(action);
+            let _ = scratch_game.apply(action, None);
             search_path.push(action);
         }
 
@@ -293,7 +293,7 @@ pub async fn play_game(
         };
 
         // println!("Player {} --- {}", game.current_player(), action);
-        let _ = game.apply(action);
+        let _ = game.apply(action, None);
         bar.inc(1);
     }
 

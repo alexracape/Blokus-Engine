@@ -1,5 +1,5 @@
-use std::rc::Rc;
 use std::collections::HashSet;
+use std::rc::Rc;
 
 use gloo_console as console;
 use yew::prelude::*;
@@ -7,15 +7,17 @@ use yew::prelude::*;
 use blokus::game::{Action, Game};
 use blokus::pieces::{Piece, PieceVariant};
 
-
 /// Wrapper for the game state so that we can implement Reducible
 #[derive(Clone)]
 pub struct GameState(Game);
 
 impl GameState {
-
     pub fn reset() -> Self {
         GameState(Game::reset())
+    }
+
+    pub fn apply(&mut self, tile: usize, piece_to_finish: Option<usize>) -> Result<(), String> {
+        self.0.apply(tile, piece_to_finish)
     }
 
     pub fn current_player(&self) -> Option<usize> {
@@ -51,7 +53,6 @@ impl GameState {
     }
 }
 
-
 impl Reducible for GameState {
     type Action = Action;
 
@@ -59,7 +60,7 @@ impl Reducible for GameState {
         match action {
             Action::PlacePiece(p, v, o) => {
                 let player = self.current_player().expect("No current player");
-                let new_state = (*self).clone();
+                let mut new_state = (*self).clone();
                 let piece = self.get_piece(player, p, v);
 
                 // Check if move is valid
@@ -68,8 +69,24 @@ impl Reducible for GameState {
                     return self.into();
                 }
 
+                // Break move into tiles and apply individually
+                let offsets = piece.offsets.iter().collect::<Vec<_>>();
+                let last_index = offsets.len().saturating_sub(1);
+                for (i, tile_offset) in offsets.iter().enumerate() {
+                    let tile = o + *tile_offset;
+                    let result = if i == last_index {
+                        new_state.apply(tile, Some(p))
+                    } else {
+                        new_state.apply(tile, None)
+                    };
+
+                    if let Err(e) = result {
+                        console::log!("Error applying move: {}", e);
+                        return self.into();
+                    }
+                }
+
                 // Remove piece from player and place piece
-                // player.pieces.remove(p);
                 // let used_spaces = new_state.board.place_piece(player, &piece, o);
                 // new_state.current_player = self.next_player();
 
