@@ -103,7 +103,11 @@ impl Game {
         }
     }
 
-    pub fn apply(&mut self, tile: usize) -> Result<(), String> {
+    // Plays a tile on the board
+    // Not thrilled with the implementation
+    // Right now it forces you to place as many tiles as is legal or you can pass a piece you
+    // want to finish playing. This is really only used by the GUI rn
+    pub fn apply(&mut self, tile: usize, piece_to_finish: Option<usize>) -> Result<(), String> {
         // Place piece on board
         let current_player = match self.current_player() {
             Some(p) => p,
@@ -128,12 +132,15 @@ impl Game {
         }
 
         // Advance to next player if necessary
-        if self.legal_tiles.len() == 0 {
+        if self.legal_tiles.len() == 0 || piece_to_finish.is_some() {
             // Removing the player's piece
-            let (piece, _variant, _offset) = valid_moves.iter().next().unwrap();
+            let piece = match piece_to_finish {
+                Some(p) => p,
+                None => valid_moves.iter().next().unwrap().0,
+            };
             self.last_piece_lens[current_player] =
-                self.board.get_pieces(current_player).remove(*piece).points;
-            self.board.use_piece(current_player, *piece);
+                self.board.get_pieces(current_player).remove(piece).points;
+            self.board.use_piece(current_player, piece);
 
             // Advance to next player
             loop {
