@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::iter::zip;
 
 use crate::board::Board;
-use crate::pieces::Piece;
+use crate::pieces::{Piece, PieceVariant};
 
 const BOARD_SPACES: usize = 400;
 
@@ -190,6 +190,10 @@ impl Game {
     pub fn get_current_player_pieces(&self) -> Vec<Piece> {
         let current_player = self.current_player().expect("No current player");
         self.board.get_pieces(current_player)
+    }
+
+    pub fn get_piece(&self, player: usize, piece: usize, variant: usize) -> PieceVariant {
+        self.board.get_pieces(player)[piece].variants[variant].clone()
     }
 
     pub fn get_current_anchors(&self) -> HashSet<usize> {
