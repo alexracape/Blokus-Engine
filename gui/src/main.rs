@@ -1,7 +1,10 @@
 mod app;
 mod board;
-mod pieces;
 mod game_state;
+mod pieces;
+mod grpc {
+    tonic::include_proto!("blokusmodel");
+}
 
 use app::App;
 
