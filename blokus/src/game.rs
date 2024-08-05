@@ -6,13 +6,6 @@ use crate::pieces::{Piece, PieceVariant};
 
 const BOARD_SPACES: usize = 400;
 
-pub enum Action {
-    PlacePiece(usize, usize, usize),
-    Pass,
-    Undo,
-    ResetGame,
-}
-
 /// Get the legal moves for a piece
 fn get_piece_moves(
     piece_i: usize,
@@ -101,6 +94,41 @@ impl Game {
             legal_tiles: legal_tiles,
             last_piece_lens: [0; 4],
         }
+    }
+
+    /// TODO: Implement
+    pub fn pass(&self) -> Result<Game, String> {
+        Ok(self.clone())
+    }
+
+    pub fn place_piece(&self, p: usize, v: usize, o: usize) -> Result<Game, String> {
+        let mut new_state = self.clone();
+        let player = self.current_player().expect("No current player");
+        let piece = self.get_piece(player, p, v);
+
+        // Check if move is valid
+        if !new_state.board.is_valid_move(player, &piece, o) {
+            return Err("Invalid move".to_string());
+        }
+
+        // Break move into tiles and apply individually
+        let offsets = piece.offsets.iter().collect::<Vec<_>>();
+        let last_index = offsets.len().saturating_sub(1);
+        for (i, tile_offset) in offsets.iter().enumerate() {
+            let tile = o + *tile_offset;
+            let result = if i == last_index {
+                new_state.apply(tile, Some(p))
+            } else {
+                new_state.apply(tile, None)
+            };
+
+            match result {
+                Ok(_) => (),
+                Err(e) => return Err(e),
+            }
+        }
+
+        Ok(new_state)
     }
 
     // Plays a tile on the board
