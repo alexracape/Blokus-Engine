@@ -116,6 +116,12 @@ pub fn App() -> Html {
             let game = new_state.clone();
             state.set(new_state);
 
+            // Check if game is over
+            if game.is_terminal() {
+                console::log!("Game over!");
+                return;
+            }
+
             // Handle AI moves
             let state = state.clone();
             spawn_local({
