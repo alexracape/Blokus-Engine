@@ -1,19 +1,100 @@
 use gloo_console as console;
+use tonic_web_wasm_client::Client;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::board::BlokusBoard;
+use crate::grpc::blokus_model_client::BlokusModelClient;
+use crate::grpc::StateRepresentation;
 use crate::pieces::PieceTray;
 use blokus::game::Game;
 
+const SERVER_ADDRESS: &str = "http://0.0.0.0:8092";
+const BOARD_SIZE: usize = 400;
+
+trait RpcRep {
+    fn get_rpc_rep(&self) -> StateRepresentation;
+}
+
+impl RpcRep for Game {
+    /// Get a representation of the state for the neural network
+    /// This representation includes the board and the legal tiles
+    /// Oriented to the current player
+    fn get_rpc_rep(&self) -> StateRepresentation {
+        // Get rep for the pieces on the board
+        let current_player = self.current_player().expect("No current player");
+        let board = &self.board.board;
+        let mut board_rep = [[false; BOARD_SIZE]; 5];
+        for i in 0..BOARD_SIZE {
+            let player = (board[i] & 0b1111) as usize; // check if there is a player piece
+            let player_board = (4 + player - current_player) % 4; // orient to current player (0 indexed)
+            if player != 0 {
+                board_rep[player_board][i] = true;
+            }
+        }
+
+        // Get rep for the legal spaces
+        let legal_moves = self.legal_tiles();
+        for tile in legal_moves {
+            board_rep[4][tile] = true;
+        }
+
+        StateRepresentation {
+            boards: board_rep.into_iter().flat_map(|inner| inner).collect(),
+            player: current_player as i32,
+        }
+    }
+}
+
 /// Takes state and returns tile to place
-async fn get_ai_move() -> usize {
-    1
+async fn get_ai_move(
+    state: &Game,
+    client: &mut BlokusModelClient<Client>,
+) -> Result<usize, String> {
+    let representation = state.get_rpc_rep();
+    let request = tonic::Request::new(representation);
+
+    let prediction = client
+        .predict(request)
+        .await
+        .map_err(|e| format!("Prediction error: {}", e))?
+        .into_inner();
+    let policy = prediction.policy;
+
+    // Process policy and value as needed
+    let tile = policy
+        .iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+        .map(|(i, _)| i)
+        .expect("No policy found");
+
+    Ok(tile)
 }
 
 /// Applies AI moves to state after player has gone
-async fn handle_ai_moves(state: Game) -> Game {
-    state
+async fn handle_ai_moves(state: Game, client: &mut BlokusModelClient<Client>) -> Game {
+    let mut next_state = state.clone();
+    let player = state.current_player().unwrap();
+    let mut current_ai = next_state.next_player();
+    while current_ai != player {
+        match get_ai_move(&state, client).await {
+            Ok(tile) => {
+                if let Err(e) = next_state.apply(tile, None) {
+                    console::error!("Failed to apply AI move: {:?}", e);
+                    break;
+                }
+            }
+            Err(e) => {
+                console::error!("Failed to get AI move: {:?}", e);
+                break;
+            }
+        }
+
+        current_ai = next_state.next_player();
+    }
+
+    next_state
 }
 
 #[function_component]
@@ -44,7 +125,9 @@ pub fn App() -> Html {
             spawn_local({
                 async move {
                     let game = (*state).clone();
-                    let new_state = handle_ai_moves(game).await;
+                    let mut client =
+                        BlokusModelClient::new(Client::new(SERVER_ADDRESS.to_string()));
+                    let new_state = handle_ai_moves(game, &mut client).await;
                     state.set(new_state);
                 }
             });
