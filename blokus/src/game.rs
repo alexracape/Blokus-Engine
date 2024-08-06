@@ -2,16 +2,9 @@ use std::collections::{HashMap, HashSet};
 use std::iter::zip;
 
 use crate::board::Board;
-use crate::pieces::Piece;
+use crate::pieces::{Piece, PieceVariant};
 
 const BOARD_SPACES: usize = 400;
-
-pub enum Action {
-    PlacePiece(usize, usize, usize),
-    Pass,
-    Undo,
-    ResetGame,
-}
 
 /// Get the legal moves for a piece
 fn get_piece_moves(
@@ -103,6 +96,41 @@ impl Game {
         }
     }
 
+    /// TODO: Implement
+    pub fn pass(&self) -> Result<Game, String> {
+        Ok(self.clone())
+    }
+
+    pub fn place_piece(&self, p: usize, v: usize, o: usize) -> Result<Game, String> {
+        let mut new_state = self.clone();
+        let player = self.current_player().expect("No current player");
+        let piece = self.get_piece(player, p, v);
+
+        // Check if move is valid
+        if !new_state.board.is_valid_move(player, &piece, o) {
+            return Err("Invalid move".to_string());
+        }
+
+        // Break move into tiles and apply individually
+        let offsets = piece.offsets.iter().collect::<Vec<_>>();
+        let last_index = offsets.len().saturating_sub(1);
+        for (i, tile_offset) in offsets.iter().enumerate() {
+            let tile = o + *tile_offset;
+            let result = if i == last_index {
+                new_state.apply(tile, Some(p))
+            } else {
+                new_state.apply(tile, None)
+            };
+
+            match result {
+                Ok(_) => (),
+                Err(e) => return Err(e),
+            }
+        }
+
+        Ok(new_state)
+    }
+
     // Plays a tile on the board
     // Not thrilled with the implementation
     // Right now it forces you to place as many tiles as is legal or you can pass a piece you
@@ -190,6 +218,10 @@ impl Game {
     pub fn get_current_player_pieces(&self) -> Vec<Piece> {
         let current_player = self.current_player().expect("No current player");
         self.board.get_pieces(current_player)
+    }
+
+    pub fn get_piece(&self, player: usize, piece: usize, variant: usize) -> PieceVariant {
+        self.board.get_pieces(player)[piece].variants[variant].clone()
     }
 
     pub fn get_current_anchors(&self) -> HashSet<usize> {
