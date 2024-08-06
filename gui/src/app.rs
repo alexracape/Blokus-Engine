@@ -35,6 +35,7 @@ impl RpcRep for Game {
 
         // Get rep for the legal spaces
         let legal_moves = self.legal_tiles();
+        console::log!(format!("Legal moves: {:?}", legal_moves));
         for tile in legal_moves {
             board_rep[4][tile] = true;
         }
@@ -60,6 +61,7 @@ async fn get_ai_move(
         .map_err(|e| format!("Prediction error: {}", e))?
         .into_inner();
     let policy = prediction.policy;
+    console::log!(format!("Policy: {:?}", policy));
 
     // Process policy and value as needed
     let tile = policy
@@ -75,23 +77,22 @@ async fn get_ai_move(
 /// Applies AI moves to state after player has gone
 async fn handle_ai_moves(state: Game, client: &mut BlokusModelClient<Client>) -> Game {
     let mut next_state = state.clone();
-    let player = state.current_player().unwrap();
-    let mut current_ai = next_state.next_player();
-    while current_ai != player {
-        match get_ai_move(&state, client).await {
+    let mut current_ai = next_state.current_player().unwrap();
+    while current_ai != 0 {
+        match get_ai_move(&next_state, client).await {
             Ok(tile) => {
                 if let Err(e) = next_state.apply(tile, None) {
                     console::error!("Failed to apply AI move: {:?}", e);
                     break;
                 }
+                console::log!("AI placed piece at: {:?}", tile);
             }
             Err(e) => {
                 console::error!("Failed to get AI move: {:?}", e);
                 break;
             }
         }
-
-        current_ai = next_state.next_player();
+        current_ai = next_state.current_player().unwrap();
     }
 
     next_state
@@ -104,13 +105,7 @@ pub fn App() -> Html {
     let on_board_drop = {
         let state = state.clone();
         Callback::from(move |(p, v, offset)| {
-            // Debug to console
-            console::log!("Piece", p);
-            console::log!("Variant", v);
-            console::log!("Offset", offset);
-
             // Place piece on board
-            //state.dispatch(Action::PlacePiece(p, v, offset));
             let new_state = match state.place_piece(p, v, offset) {
                 Ok(s) => s,
                 Err(e) => {
@@ -118,13 +113,13 @@ pub fn App() -> Html {
                     return;
                 }
             };
+            let game = new_state.clone();
             state.set(new_state);
 
             // Handle AI moves
             let state = state.clone();
             spawn_local({
                 async move {
-                    let game = (*state).clone();
                     let mut client =
                         BlokusModelClient::new(Client::new(SERVER_ADDRESS.to_string()));
                     let new_state = handle_ai_moves(game, &mut client).await;
