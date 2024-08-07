@@ -171,18 +171,7 @@ impl Game {
             self.board.use_piece(current_player, piece);
 
             // Advance to next player
-            loop {
-                let next = self.next_player();
-                self.legal_tiles = get_tile_moves(&self.board, next);
-                if self.legal_tiles.len() == 0 {
-                    self.eliminate_player();
-                    if self.is_terminal() {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
+            self.advance_player();
         }
 
         Ok(())
@@ -192,9 +181,28 @@ impl Game {
         &self.board.board
     }
 
+    /// Gets the next player, and advances the player index
     pub fn next_player(&mut self) -> usize {
         self.player_index = (self.player_index + 1) % self.players_remaining.len();
         self.players_remaining[self.player_index]
+    }
+
+    /// Cycle to the next player
+    /// Eliminates any players that have no legal moves
+    /// Returns index of the current player or None if the game is terminal
+    pub fn advance_player(&mut self) -> Option<usize> {
+        loop {
+            let next = self.next_player();
+            self.legal_tiles = get_tile_moves(&self.board, next);
+            if self.legal_tiles.len() == 0 {
+                self.eliminate_player();
+                if self.is_terminal() {
+                    return None;
+                }
+            } else {
+                return Some(next);
+            }
+        }
     }
 
     pub fn current_player(&self) -> Option<usize> {
