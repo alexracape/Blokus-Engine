@@ -6,16 +6,14 @@ use std::collections::HashSet;
 
 use crate::pieces::{Piece, PieceVariant, PIECE_TYPES};
 
-
 pub const BOARD_SIZE: usize = 20;
 const TOTAL_TILES: i32 = 89;
 const CORNERS_OFFSETS: [i32; 4] = [
     1 + BOARD_SIZE as i32,
-    -1 - BOARD_SIZE as i32, 
-    1 - BOARD_SIZE as i32, 
-    -1 + BOARD_SIZE as i32
+    -1 - BOARD_SIZE as i32,
+    1 - BOARD_SIZE as i32,
+    -1 + BOARD_SIZE as i32,
 ];
-
 
 #[derive(Clone)]
 pub struct Board {
@@ -26,14 +24,23 @@ pub struct Board {
 
 impl Board {
     pub fn new() -> Board {
-
         let mut pieces = Vec::new();
         for piece_type in PIECE_TYPES {
             pieces.push(Piece::new(piece_type));
         }
-        let player_pieces = [pieces.clone(), pieces.clone(), pieces.clone(), pieces.clone()];
+        let player_pieces = [
+            pieces.clone(),
+            pieces.clone(),
+            pieces.clone(),
+            pieces.clone(),
+        ];
 
-        let mut anchors = [HashSet::new(), HashSet::new(), HashSet::new(), HashSet::new()];
+        let mut anchors = [
+            HashSet::new(),
+            HashSet::new(),
+            HashSet::new(),
+            HashSet::new(),
+        ];
         for i in 0..4 {
             let start = match i {
                 0 => 0,
@@ -52,8 +59,12 @@ impl Board {
         }
     }
 
-    pub fn is_valid_move(&self, player: usize, piece_variant: &PieceVariant, offset: usize) -> bool {
-
+    pub fn is_valid_move(
+        &self,
+        player: usize,
+        piece_variant: &PieceVariant,
+        offset: usize,
+    ) -> bool {
         // Check piece is within bounds and does not go over edge of board
         let variant = &piece_variant.variant;
         let piece_squares = &piece_variant.offsets;
@@ -74,15 +85,16 @@ impl Board {
             true
         });
 
-        let on_anchor = piece_squares.iter().any(|i| self.anchors[player].contains(&(offset + i)));
+        let on_anchor = piece_squares
+            .iter()
+            .any(|i| self.anchors[player].contains(&(offset + i)));
         on_blanks && on_anchor
     }
 
-    
     /// Place a tile on the board
     pub fn place_tile(&mut self, tile: usize, player: usize) {
         self.board[tile] = 0b1111_0000 | (player as u8 + 1);
-    
+
         // Restrict adjacent square
         let player_restricted: u8 = 1 << player + 4;
         let neighbors = [
@@ -92,21 +104,28 @@ impl Board {
             (tile < BOARD_SIZE * (BOARD_SIZE - 1), BOARD_SIZE as isize), // Bellow
         ];
 
+        // Remove tile from all anchors if it is there
+        for i in 0..4 {
+            self.anchors[i].remove(&tile);
+        }
+
         // Iterate over neighbors, restrict, and remove from anchors if necessary
         for &(in_bounds, offset) in &neighbors {
             if in_bounds {
                 let neighbor = (tile as isize + offset) as usize;
                 self.board[neighbor] |= player_restricted;
-                self.anchors[player].remove(&neighbor);         
+                self.anchors[player].remove(&neighbor);
             }
         }
 
-        // Add new anchors - TODO SOMETHING WRONG WITH ANCHORW
+        // Add new anchors
         for corner_offset in CORNERS_OFFSETS.iter() {
-
             // Skip if corner is above or below board or it is a restricted square
             let corner = tile as i32 + corner_offset;
-            if corner < 0 || corner >= (BOARD_SIZE * BOARD_SIZE) as i32 || self.board[corner as usize] & player_restricted != 0{
+            if corner < 0
+                || corner >= (BOARD_SIZE * BOARD_SIZE) as i32
+                || self.board[corner as usize] & player_restricted != 0
+            {
                 continue;
             }
 
@@ -116,10 +135,9 @@ impl Board {
             }
             if tile % BOARD_SIZE == BOARD_SIZE - 1 && (corner as usize) % BOARD_SIZE == 0 {
                 continue;
-            }   
+            }
             self.anchors[player].insert(corner as usize);
         }
-        
     }
 
     pub fn get_anchors(&self, player: usize) -> HashSet<usize> {
@@ -135,19 +153,17 @@ impl Board {
     }
 
     pub fn get_scores(&self, last_piece_lens: [u32; 4]) -> Vec<i32> {
-
         // Count the number of pieces on the board for each player
         let mut scores = vec![0; 4];
         for cell in self.board.iter() {
             let player = *cell & 0b1111;
-            if player != 0{
+            if player != 0 {
                 scores[player as usize - 1] += 1;
             }
         }
 
         // 15 bonus points for playing all pieces
         for (i, pieces) in self.pieces.iter().enumerate() {
-
             // Subtract to get the number of pieces remaining
             scores[i] = scores[i] - TOTAL_TILES;
 

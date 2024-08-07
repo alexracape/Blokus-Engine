@@ -78,11 +78,12 @@ class ResNet(nn.Module):
         for block in self.res_blocks:
             x = block(x)
 
-        # Policy head
+        # Policy head - mask out illegal moves so they are 0 in policy
         policy = self.policy_head(x)
         mask = boards[:, 4, :, :].view(boards.size(0), -1)
-        policy = policy * mask
-        policy = torch.softmax(policy, dim=1)
+        policy_masked = policy * mask
+        policy_softmax = torch.softmax(policy_masked + (1 - mask) * -1e9, dim=1)
+        policy = policy_softmax * mask
 
         # Value head
         value = self.value_head(x)
