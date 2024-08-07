@@ -24,19 +24,15 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap()
         .parse::<usize>()
         .unwrap();
-    let check_interval: u64 = env::var("CHECK_INTERVAL")
-        .unwrap()
-        .parse::<u64>()
-        .unwrap();
+    let check_interval: u64 = env::var("CHECK_INTERVAL").unwrap().parse::<u64>().unwrap();
     let server_address = env::var("SERVER_URL").unwrap();
 
     // Connect to neural network
-    println!("Connecting to server at: {}", server_address);
-    let mut model = BlokusModelClient::connect(server_address).await?;
+    let mut model = BlokusModelClient::connect(server_address.clone()).await?;
+    println!("Connected to server at: {}", server_address);
 
     let mut round = 0;
     while round < rounds {
-        
         // Play games to generate data
         for i in 0..games {
             let result = play_game(&mut model).await;
@@ -54,15 +50,14 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(check_interval)).await;
 
-            let response = model.check(tonic::Request::new(Empty{})).await?;
+            let response = model.check(tonic::Request::new(Empty {})).await?;
             let current_round = response.into_inner().code as usize;
             if current_round > round {
                 break;
             }
-        } 
+        }
         round += 1;
-
-    } 
+    }
 
     println!("Training complete!");
     Ok(())
