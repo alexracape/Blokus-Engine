@@ -63,9 +63,12 @@ CHECK_INTERVAL=2
 
 ## Usage:
 
-To open the GUI in the browser run:
+To open the GUI in the browser run the model server and the proxy server then run:
 `cd gui`
 `trunk serve --open`
+
+To run the proxy server:
+`envoy -c proxy/envoy.yaml`
 
 To run server:
 `python model/model_server.py`
