@@ -1,18 +1,11 @@
 // One game of self-play using MCTS and a neural network
 use rand::Rng;
 use rand_distr::{Dirichlet, Distribution};
-use std::env;
+use std::process::id;
 use std::vec;
 
-use crate::grpc::blokus_model_client::BlokusModelClient;
-use crate::grpc::ActionProb;
-use crate::grpc::Game as GameRep;
-use crate::grpc::Move;
-use crate::grpc::Policy;
-use crate::grpc::StateRepresentation;
-
 use indicatif::ProgressBar;
-use tonic::transport::Channel;
+use pyo3::prelude::*;
 
 use crate::node::Node;
 use blokus::board::BOARD_SIZE as D;
@@ -20,41 +13,36 @@ use blokus::game::Game;
 
 const BOARD_SIZE: usize = D * D;
 
-/// Configuration of the self-play simulation
+#[derive(FromPyObject)]
 pub struct Config {
-    pub sims_per_move: usize,
-    pub sample_moves: usize,
-    pub c_base: f32,
-    pub c_init: f32,
-    pub dirichlet_alpha: f32,
-    pub exploration_fraction: f32,
+    training_rounds: i32,
+    buffer_capacity: i32,
+    learning_rate: f64,
+    batch_size: i32,
+    inference_interval: f64,
+    training_steps: i32,
+    num_workers: i32,
+    games_per_worker: i32,
+    rounds: i32,
+    nn_width: i32,
+    nn_depth: i32,
+    sims_per_move: usize,
+    sample_moves: usize,
+    c_base: f32,
+    c_init: f32,
+    dirichlet_alpha: f32,
+    exploration_fraction: f32,
 }
 
-impl Config {
-    pub fn build() -> Config {
-        Config {
-            sims_per_move: env::var("SIMS_PER_MOVE").unwrap().parse::<usize>().unwrap(),
-            sample_moves: env::var("SAMPLE_MOVES").unwrap().parse::<usize>().unwrap(),
-            c_base: env::var("C_BASE").unwrap().parse::<f32>().unwrap(),
-            c_init: env::var("C_INIT").unwrap().parse::<f32>().unwrap(),
-            dirichlet_alpha: env::var("DIRICHLET_ALPHA").unwrap().parse::<f32>().unwrap(),
-            exploration_fraction: env::var("EXPLORATION_FRAC")
-                .unwrap()
-                .parse::<f32>()
-                .unwrap(),
-        }
-    }
+trait StateRepr {
+    fn get_representation(&self) -> [[bool; BOARD_SIZE]; 5];
 }
 
-trait RpcRepr {
-    fn get_representation(&self) -> StateRepresentation;
-}
-
-impl RpcRepr for Game {
+impl StateRepr for Game {
     /// Get a representation of the state for the neural network
     /// This representation includes the board and the legal tiles
     /// Oriented to the current player
-    fn get_representation(&self) -> StateRepresentation {
+    fn get_representation(&self) -> [[bool; BOARD_SIZE]; 5] {
         // Get rep for the pieces on the board
         let current_player = self.current_player().expect("No current player");
         let board = &self.board.board;
@@ -73,18 +61,18 @@ impl RpcRepr for Game {
             board_rep[4][tile] = true;
         }
 
-        StateRepresentation {
-            boards: board_rep.into_iter().flat_map(|inner| inner).collect(),
-            player: current_player as i32,
-        }
+        board_rep
     }
 }
 
 /// Evaluate and Expand the Node
-async fn evaluate(
+fn evaluate(
     node: &mut Node,
     game: &Game,
-    model: &mut BlokusModelClient<Channel>,
+    config: &Config,
+    inference_queue: &Bound<PyAny>,
+    pipe: &Bound<PyAny>,
+    id: i32,
 ) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
     // If the game is over, return the payoff
     if game.is_terminal() {
@@ -93,11 +81,15 @@ async fn evaluate(
 
     // Get the policy and value from the neural network
     let representation = game.get_representation();
-    let legal_moves = representation.boards[1600..2000].to_vec();
-    let request = tonic::Request::new(representation);
-    let prediction = model.predict(request).await?.into_inner();
-    let policy = prediction.policy;
-    let value = prediction.value;
+    let legal_moves = representation[4].to_vec();
+
+    // Put the request in the queue
+    inference_queue.call_method1("put", (id, representation))?;
+
+    // Wait for the result
+    let inference = pipe.call_method0("recv")?;
+    let policy: Vec<f32> = inference.get_item(0)?.extract()?;
+    let value: Vec<f32> = inference.get_item(1)?.extract()?;
     let current_player = game.current_player().unwrap();
 
     // Normalize policy for node priors, filter out illegal moves
@@ -213,15 +205,17 @@ fn backpropagate(search_path: Vec<usize>, root: &mut Node, values: Vec<f32>) -> 
 }
 
 /// Run MCTS simulations to get policy for root node
-async fn mcts(
+fn mcts(
     game: &Game,
-    model: &mut BlokusModelClient<Channel>,
-    policies: &mut Vec<Policy>,
+    policies: &mut Vec<Vec<(i32, f32)>>,
     config: &Config,
+    inference_queue: &Bound<PyAny>,
+    pipe: &Bound<PyAny>,
+    id: i32,
 ) -> Result<usize, Box<dyn std::error::Error>> {
     // Initialize root for these sims, evaluate it, and add children
     let mut root = Node::new(0.0);
-    match evaluate(&mut root, game, model).await {
+    match evaluate(&mut root, game, config, inference_queue, pipe, id) {
         Ok(_) => (),
         Err(e) => {
             println!("Error evaluating root node: {:?}", e);
@@ -243,7 +237,7 @@ async fn mcts(
         }
 
         // Expand and evaluate the leaf node
-        let values = evaluate(&mut node, &scratch_game, model).await?;
+        let values = evaluate(&mut root, &scratch_game, config, inference_queue, pipe, id).unwrap();
 
         // Backpropagate the value
         backpropagate(search_path, &mut root, values)
@@ -260,35 +254,37 @@ async fn mcts(
         .iter()
         .map(|(tile, child)| {
             let p = (child.visits as f32) / (total_visits as f32);
-            ActionProb {
-                action: *tile as i32,
-                prob: p,
-            }
+            (*tile as i32, p)
         })
         .collect();
-    policies.push(Policy { probs: probs });
+    policies.push(probs);
 
     // Pick action to take
     let action = select_action(&root, policies.len(), config);
     Ok(action)
 }
 
-pub async fn play_game(
-    model: &mut BlokusModelClient<Channel>,
-) -> Result<String, Box<dyn std::error::Error>> {
-    let config = Config::build();
+pub fn play_game(
+    config: Config,
+    inference_queue: &Bound<PyAny>,
+    pipe: &Bound<PyAny>,
+    id: i32,
+) -> Result<(Vec<(i32, i32)>, Vec<Vec<(i32, f32)>>, Vec<f32>), String> {
+    // Storage for game data
+    let mut game = Game::reset();
+    let mut policies: Vec<Vec<(i32, f32)>> = Vec::new();
+
+    // Run self-play to generate data
     let bar = ProgressBar::new(BOARD_SIZE as u64);
 
     // Run self-play to generate data
-    let mut game = Game::reset();
-    let mut policies: Vec<Policy> = Vec::new();
     while !game.is_terminal() {
         // Get MCTS policy for current state
-        let action = match mcts(&game, model, &mut policies, &config).await {
+        let action = match mcts(&game, &mut policies, &config, inference_queue, pipe, id) {
             Ok(a) => a,
             Err(e) => {
                 println!("Error running MCTS: {:?}", e);
-                return Err(e);
+                return Err("Error running MCTS".to_string());
             }
         };
 
@@ -298,25 +294,14 @@ pub async fn play_game(
     }
 
     // Train the model
-    let game_data = tonic::Request::new(GameRep {
-        history: game
-            .history
-            .iter()
-            .map(|(p, t)| Move {
-                player: *p,
-                tile: *t,
-            })
-            .collect(),
-        policies: policies,
-        values: game.get_payoff(),
-    });
+    let game_data = (game.history, policies, game.get_payoff());
     bar.finish();
-    model.save(game_data).await?;
-
-    // game.board.print_board();
-    Ok(format!(
+    println!(
         "Game finished with payoff: {:?} and score: {:?}",
         game.get_payoff(),
         game.get_score()
-    ))
+    );
+
+    // game.board.print_board();
+    Ok(game_data)
 }
