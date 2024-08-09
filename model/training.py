@@ -240,7 +240,7 @@ class Config:
         self.batch_size = 256
         self.inference_interval = .001  # seconds
         self.training_steps = 10
-        self.num_workers = num_cpus + 1
+        self.num_workers = num_cpus
         self.games_per_worker = 1
         self.rounds = 1
         self.nn_width = 128
