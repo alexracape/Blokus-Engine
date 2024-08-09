@@ -1,5 +1,5 @@
 [package]
-name = "self_play"
+name = "blokus_self_play"
 version = "0.1.0"
 authors = ["Alex Racapé"]
 edition = "2021"

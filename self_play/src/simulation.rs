@@ -1,7 +1,6 @@
 // One game of self-play using MCTS and a neural network
 use rand::Rng;
 use rand_distr::{Dirichlet, Distribution};
-use std::process::id;
 use std::vec;
 
 use indicatif::ProgressBar;
@@ -15,17 +14,6 @@ const BOARD_SIZE: usize = D * D;
 
 #[derive(FromPyObject)]
 pub struct Config {
-    training_rounds: i32,
-    buffer_capacity: i32,
-    learning_rate: f64,
-    batch_size: i32,
-    inference_interval: f64,
-    training_steps: i32,
-    num_workers: i32,
-    games_per_worker: i32,
-    rounds: i32,
-    nn_width: i32,
-    nn_depth: i32,
     sims_per_move: usize,
     sample_moves: usize,
     c_base: f32,
@@ -35,30 +23,30 @@ pub struct Config {
 }
 
 trait StateRepr {
-    fn get_representation(&self) -> [[bool; BOARD_SIZE]; 5];
+    fn get_representation(&self) -> [[f32; BOARD_SIZE]; 5];
 }
 
 impl StateRepr for Game {
     /// Get a representation of the state for the neural network
     /// This representation includes the board and the legal tiles
     /// Oriented to the current player
-    fn get_representation(&self) -> [[bool; BOARD_SIZE]; 5] {
+    fn get_representation(&self) -> [[f32; BOARD_SIZE]; 5] {
         // Get rep for the pieces on the board
         let current_player = self.current_player().expect("No current player");
         let board = &self.board.board;
-        let mut board_rep = [[false; BOARD_SIZE]; 5];
+        let mut board_rep = [[0.0; BOARD_SIZE]; 5];
         for i in 0..BOARD_SIZE {
             let player = (board[i] & 0b1111) as usize; // check if there is a player piece
             let player_board = (4 + player - current_player) % 4; // orient to current player (0 indexed)
             if player != 0 {
-                board_rep[player_board][i] = true;
+                board_rep[player_board][i] = 1.0;
             }
         }
 
         // Get rep for the legal spaces
         let legal_moves = self.legal_tiles();
         for tile in legal_moves {
-            board_rep[4][tile] = true;
+            board_rep[4][tile] = 1.0;
         }
 
         board_rep
@@ -84,7 +72,8 @@ fn evaluate(
     let legal_moves = representation[4].to_vec();
 
     // Put the request in the queue
-    inference_queue.call_method1("put", (id, representation))?;
+    let request = (id, representation);
+    inference_queue.call_method1("put", (request,))?;
 
     // Wait for the result
     let inference = pipe.call_method0("recv")?;
@@ -97,7 +86,7 @@ fn evaluate(
         .iter()
         .enumerate()
         .filter_map(|(i, &logit)| {
-            if legal_moves[i] {
+            if legal_moves[i] == 1.0 {
                 Some((i, logit.exp()))
             } else {
                 None
@@ -294,12 +283,13 @@ pub fn play_game(
     }
 
     // Train the model
-    let game_data = (game.history, policies, game.get_payoff());
+    let values = game.get_payoff();
+    let scores = game.get_score();
+    let game_data = (game.history, policies, values.clone());
     bar.finish();
     println!(
         "Game finished with payoff: {:?} and score: {:?}",
-        game.get_payoff(),
-        game.get_score()
+        values, scores
     );
 
     // game.board.print_board();

@@ -9,15 +9,15 @@ use simulation::Config;
 /// Formats the sum of two numbers as string.
 #[pyfunction]
 fn generate_game_data(
+    id: i32,
     config: PyObject,
     inference_queue: PyObject,
-    result_queue: PyObject,
-    id: i32,
+    pipe: PyObject,
 ) -> PyResult<(Vec<(i32, i32)>, Vec<Vec<(i32, f32)>>, Vec<f32>)> {
     let game_data = Python::with_gil(|py| {
         let config: Config = config.extract::<Config>(py).unwrap();
         let i_queue = inference_queue.bind(py);
-        let r_queue = result_queue.bind(py);
+        let r_queue = pipe.bind(py);
         play_game(config, i_queue, r_queue, id)
     });
 
