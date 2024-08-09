@@ -1,6 +1,7 @@
 import multiprocessing as mp
 import logging
 import os
+import time
 from queue import Empty
 
 import numpy as np
@@ -9,7 +10,7 @@ import torch
 from torchrl.data import ReplayBuffer, LazyTensorStorage
 from tensordict import tensorclass
 
-from blokus_self_play import play_game
+from blokus_self_play import generate_game_data
 from resnet import ResNet
 
 DIM = 20
@@ -23,59 +24,85 @@ class Data:
     scores: torch.Tensor
 
 
-def process_inference_batches(model, device, inference_queue, pipes_to_workers):
-    """Process batches of inputs from the self-play games"""
-
+def get_batch(queue, device):
+    ids = []
+    items = []
     while True:
         try:
-            # TODO: Pull from here and process batch in one go
-            idx, inputs = inference_queue.get(timeout=1)  # Get input from the queue
-            inputs = torch.tensor(inputs).to(device)
-            with torch.no_grad():
-                batch = torch.stack(requests)
-                outputs = model(inputs)
-            result_queue.put((idx, outputs.cpu().numpy()))  # Put result in the result queue
+            id, input = queue.get_nowait()
+            input = torch.tensor(input).reshape(5, DIM, DIM).to(device)
+            ids.append(id)
+            items.append(input)
         except Empty:
+            break
+
+    if not ids:
+        return [], torch.tensor([])
+
+    return ids, torch.stack(items)
+
+
+def process_inference_batches(model, config, device, inference_queue, pipes_to_workers, stop_processing):
+    """Process batches of inputs from the self-play games"""
+
+    while not stop_processing.is_set():
+        try:
+            # Pause then get the next batch of inputs
+            time.sleep(config.inference_interval)
+            ids, batch = get_batch(inference_queue, device)
+            if not ids:
+                continue
+
+            # Query the model for the batch of inputs
+            with torch.no_grad():
+                policies, values = model(batch)
+
+            # Send the outputs to the appropriate worker
+            for i, id in enumerate(ids):
+                response = (policies[i].cpu().tolist(), values[i].cpu().tolist())
+                pipes_to_workers[id].send(response)
+
+        except Empty or EOFError:
             continue
 
 
 def save(game, buffer: ReplayBuffer,):
     """Save the game data to the replay buffer"""
 
-    logging.info(f"Saving game: {game}")
-
     # Allocate space for the data
     history, policies, values = game
-    num_moves = len(game)
-    states = torch.zeros(num_moves, 5, DIM, DIM, dtype=torch.float32)
-    policies = torch.zeros(num_moves, DIM * DIM, dtype=torch.float32)
-    scores = torch.tensor(values, dtype=torch.float32).repeat(num_moves, 1)
+    num_moves = len(history)
+    logging.info(f"Saving game with {num_moves} moves to the replay buffer")
+
+    state_data = torch.zeros(num_moves, 5, DIM, DIM, dtype=torch.float32)
+    policy_data = torch.zeros(num_moves, DIM * DIM, dtype=torch.float32)
+    value_data = torch.tensor(values, dtype=torch.float32).repeat(num_moves, 1)
 
     # For each move from this game, update the state and policy
     new_state = torch.zeros(5, DIM, DIM, dtype=torch.float32)
     for i, (move, policy) in enumerate(zip(history, policies)):
 
         # Keep running track of state in new_state
-        player, tile = move.player, move.tile
+        player, tile = move
         row, col = tile // DIM, tile % DIM
         new_state[player, row, col] = 1
 
         # Shift the state to the correct player's perspective
-        states[i] = torch.cat((new_state[player:], new_state[:player]), dim=0)
+        state_data[i] = torch.cat((new_state[player:], new_state[:player]), dim=0)
 
         # Update the policy for this move
         for element in policy:
             action, prob = element
-            policies[i, action] = prob
+            policy_data[i, action] = prob
 
             # Update which squares are legal on this move
             row, col = action // DIM, action % DIM
-            states[i, 4, row, col] = 1
+            state_data[i, 4, row, col] = 1
 
     data = Data(
-        states = states,
-        policies = policies,
-        scores = scores,
+        states = state_data,
+        policies = policy_data,
+        scores = value_data,
         batch_size = [num_moves]
     )
     buffer.extend(data)
@@ -125,7 +152,7 @@ def main(num_cpus):
     """
 
     # Load environment variables
-    config = Config()
+    config = Config(num_cpus)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f"Using device: {device}")
 
@@ -142,14 +169,17 @@ def main(num_cpus):
     )
 
     # Set up queues and multiprocessing for self-play
-    inference_queue = mp.Queue()
+    manager = mp.Manager()
+    # manager.start()
+    inference_queue = manager.Queue()
     pipes_to_model = []
     pipes_to_workers = []
     for i in range(config.num_workers):
         a, b = mp.Pipe()
         pipes_to_model.append(a)
         pipes_to_workers.append(b)
-    inference_process = mp.Process(target=process_inference_batches, args=(model, device, inference_queue, pipes_to_workers))
+    stop_processing = mp.Event()
+    inference_process = mp.Process(target=process_inference_batches, args=(model, config, device, inference_queue, pipes_to_workers, stop_processing))
     inference_process.start()
 
     # Set up stats for tracking training progress
@@ -164,8 +194,8 @@ def main(num_cpus):
         # Generate training data through self-play
         with mp.Pool(config.num_workers) as pool:
             game_data = pool.starmap(
-                play_game,
-                [(id, config, inference_queue, pipes_to_model[id]) for id in range(config.games_per_worker)]
+                generate_game_data,
+                [(id, config, inference_queue, pipes_to_model[id]) for id in range(config.num_workers)]
             )
 
         # Save the game data to the replay buffer
@@ -177,6 +207,13 @@ def main(num_cpus):
             train(step, model, buffer, optimizer, policy_loss, value_loss, device, stats)
         torch.save(model, f"{MODEL_PATH}/model_{training_round}.pt")
         training_round += 1
+
+    # Clean up
+    stop_processing.set()
+    inference_process.join()
+    manager.shutdown()
+    logging.info("Training complete")
+
 
 
 class Config:
@@ -201,14 +238,14 @@ class Config:
         self.buffer_capacity = 10000
         self.learning_rate = 0.01
         self.batch_size = 256
-        self.inference_interval = .01  # seconds
+        self.inference_interval = .001  # seconds
         self.training_steps = 10
-        self.num_workers = num_cpus - 1
+        self.num_workers = num_cpus + 1
         self.games_per_worker = 1
         self.rounds = 1
-        self.nn_width = 256
+        self.nn_width = 128
         self.nn_depth = 2
-        self.sims_per_move = 16
+        self.sims_per_move = 2
         self.sample_moves = 30
         self.c_base = 19652
         self.c_init = 1.25
@@ -218,7 +255,7 @@ class Config:
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    num_cpus = int(os.environ.get("SLURM_NPROCS", 1))
+    num_cpus = int(os.environ.get("SLURM_NPROCS", 4))
     logging.info(f"Number of CPUs: {num_cpus}")
 
     main(num_cpus)

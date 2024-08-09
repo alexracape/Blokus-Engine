@@ -79,6 +79,17 @@ name = "blokus"
 version = "0.1.0"
 
 [[package]]
+name = "blokus_self_play"
+version = "0.1.0"
+dependencies = [
+ "blokus",
+ "indicatif",
+ "pyo3",
+ "rand",
+ "rand_distr",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1223,17 +1234,6 @@ name = "ryu"
 version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f98d2aa92eebf49b69786be48e4477826b256916e84a57ff2a4f21923b48eb4c"
-
-[[package]]
-name = "self_play"
-version = "0.1.0"
-dependencies = [
- "blokus",
- "indicatif",
- "pyo3",
- "rand",
- "rand_distr",
-]
 
 [[package]]
 name = "serde"
