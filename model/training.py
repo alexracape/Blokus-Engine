@@ -237,7 +237,7 @@ class Config:
         self.training_rounds = 1
         self.buffer_capacity = 10000
         self.learning_rate = 0.01
-        self.batch_size = 256
+        self.batch_size = 64
         self.inference_interval = .001  # seconds
         self.training_steps = 10
         self.num_workers = num_cpus
