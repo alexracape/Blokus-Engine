@@ -254,7 +254,7 @@ fn mcts(
 }
 
 pub fn play_game(
-    config: Config,
+    config: &Config,
     inference_queue: &Bound<PyAny>,
     pipe: &Bound<PyAny>,
     id: i32,

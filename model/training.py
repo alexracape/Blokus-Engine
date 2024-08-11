@@ -45,6 +45,7 @@ def get_batch(queue, device):
 def process_inference_batches(model, config, device, inference_queue, pipes_to_workers, stop_processing):
     """Process batches of inputs from the self-play games"""
 
+    model = model.to(device)
     while not stop_processing.is_set():
         try:
             # Pause then get the next batch of inputs
@@ -170,7 +171,6 @@ def main(num_cpus):
 
     # Set up queues and multiprocessing for self-play
     manager = mp.Manager()
-    # manager.start()
     inference_queue = manager.Queue()
     pipes_to_model = []
     pipes_to_workers = []
@@ -181,6 +181,7 @@ def main(num_cpus):
     stop_processing = mp.Event()
     inference_process = mp.Process(target=process_inference_batches, args=(model, config, device, inference_queue, pipes_to_workers, stop_processing))
     inference_process.start()
+    model = model.to(device)
 
     # Set up stats for tracking training progress
     stats = pd.DataFrame(columns=["round", "loss", "value_loss", "policy_loss", "buffer_size"])
@@ -195,12 +196,13 @@ def main(num_cpus):
         with mp.Pool(config.num_workers) as pool:
             game_data = pool.starmap(
                 generate_game_data,
-                [(id, config, inference_queue, pipes_to_model[id]) for id in range(config.num_workers)]
+                [(config.games_per_worker, id, config, inference_queue, pipes_to_model[id]) for id in range(config.num_workers)]
             )
 
         # Save the game data to the replay buffer
-        for game in game_data:
-            save(game, buffer)
+        for worker_games in game_data:
+            for game in worker_games:
+                save(game, buffer)
 
         # Train the model
         for step in range(config.training_steps):
@@ -234,18 +236,18 @@ class Config:
     """
 
     def __init__(self, num_cpus=4):
-        self.training_rounds = 1
-        self.buffer_capacity = 10000
+        self.training_rounds = 2
+        self.buffer_capacity = 500000
         self.learning_rate = 0.01
         self.batch_size = 64
         self.inference_interval = .001  # seconds
         self.training_steps = 10
         self.num_workers = num_cpus
-        self.games_per_worker = 1
-        self.rounds = 1
-        self.nn_width = 128
+        self.games_per_worker = 2
+        self.rounds = 2
+        self.nn_width = 32
         self.nn_depth = 2
-        self.sims_per_move = 2
+        self.sims_per_move = 5
         self.sample_moves = 30
         self.c_base = 19652
         self.c_init = 1.25
