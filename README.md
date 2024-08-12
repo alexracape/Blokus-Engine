@@ -27,17 +27,13 @@ round, and you train for 1 round, you will have 20 games worth of data. AlphaZer
 
 | *Variable* | *Description* | *AlphaZero Value* |
 | --- | --- | --- |
-| PORT | The port the server listens on |  |
-| SERVER_URL | The URL of the server | |
-| CHECK_INTERVAL | The time clients should wait before checking whether the server is still training |  |
-| BATCHING_FREQUENCY | The frequency batched requests are processed during self-play |  |
 | TRAINING_ROUNDS | The number of training rounds to run | 4,200 |
 | BUFFER_CAPACITY | The number of data points to store in the replay buffer | 1,000,000 games |
 | LEARNING_RATE | The learning rate of the neural network | .01 -> .0001 with scheduler |
 | BATCH_SIZE | The number of data points per batch | 2,048 |
 | TRAINING_STEPS | The number of training steps to run each round | 700,000 |
 | NN_WIDTH | The number of filters in each convolutional layer | 256 |
-| NN_BLOCKS | The number of residual blocks in the neural network | 20 |
+| NN_DEPTH | The number of residual blocks in the neural network | 20 |
 | NUM_CLIENTS | The number of clients to run | 5,000 |
 | GAMES_PER_CLIENT | The number of games each client generates per round | 1 |
 | SIMS_PER_MOVE | The number of simulations to run during MCTS to derive a policy | 800 |
@@ -58,11 +54,9 @@ To open the GUI in the browser run the model server and the proxy server then ru
 
 ### Training
 
-To train on the HPC, run:
+To run a job on the HPC using 32 CPU cores, 240GB of memory, and an RTX2080 card, you can do:
 
-`sbatch -N 1 -n 8 train.sh`
-
--N is the number of computer nodes and -n is the number of CPUs
+`sbatch -p mixed -N 1 -n 32 --mem=240G --gres=gpu:rtx2080:1 train.sh`
 
 
 ## References

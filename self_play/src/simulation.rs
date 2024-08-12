@@ -3,7 +3,6 @@ use rand::Rng;
 use rand_distr::{Dirichlet, Distribution};
 use std::vec;
 
-use indicatif::ProgressBar;
 use pyo3::prelude::*;
 
 use crate::node::Node;
@@ -57,7 +56,6 @@ impl StateRepr for Game {
 fn evaluate(
     node: &mut Node,
     game: &Game,
-    config: &Config,
     inference_queue: &Bound<PyAny>,
     pipe: &Bound<PyAny>,
     id: i32,
@@ -204,7 +202,7 @@ fn mcts(
 ) -> Result<usize, Box<dyn std::error::Error>> {
     // Initialize root for these sims, evaluate it, and add children
     let mut root = Node::new(0.0);
-    match evaluate(&mut root, game, config, inference_queue, pipe, id) {
+    match evaluate(&mut root, game, inference_queue, pipe, id) {
         Ok(_) => (),
         Err(e) => {
             println!("Error evaluating root node: {:?}", e);
@@ -226,7 +224,7 @@ fn mcts(
         }
 
         // Expand and evaluate the leaf node
-        let values = evaluate(&mut root, &scratch_game, config, inference_queue, pipe, id).unwrap();
+        let values = evaluate(&mut root, &scratch_game, inference_queue, pipe, id).unwrap();
 
         // Backpropagate the value
         backpropagate(search_path, &mut root, values)
@@ -254,7 +252,7 @@ fn mcts(
 }
 
 pub fn play_game(
-    config: Config,
+    config: &Config,
     inference_queue: &Bound<PyAny>,
     pipe: &Bound<PyAny>,
     id: i32,
@@ -262,9 +260,6 @@ pub fn play_game(
     // Storage for game data
     let mut game = Game::reset();
     let mut policies: Vec<Vec<(i32, f32)>> = Vec::new();
-
-    // Run self-play to generate data
-    let bar = ProgressBar::new(BOARD_SIZE as u64);
 
     // Run self-play to generate data
     while !game.is_terminal() {
@@ -279,19 +274,10 @@ pub fn play_game(
 
         // println!("Player {} --- {}", game.current_player(), action);
         let _ = game.apply(action, None);
-        bar.inc(1);
     }
 
-    // Train the model
+    // Send data to train the model
     let values = game.get_payoff();
-    let scores = game.get_score();
     let game_data = (game.history, policies, values.clone());
-    bar.finish();
-    println!(
-        "Game finished with payoff: {:?} and score: {:?}",
-        values, scores
-    );
-
-    // game.board.print_board();
     Ok(game_data)
 }
