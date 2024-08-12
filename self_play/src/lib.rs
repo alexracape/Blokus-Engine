@@ -2,7 +2,6 @@ mod node;
 mod simulation;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PyTuple};
 use simulation::play_game;
 use simulation::Config;
 

@@ -6,6 +6,7 @@ from queue import Empty
 
 import numpy as np
 import pandas as pd
+from tqdm import trange
 import torch
 from torchrl.data import ReplayBuffer, LazyTensorStorage
 from tensordict import tensorclass
@@ -45,26 +46,23 @@ def get_batch(queue, device):
 def process_inference_batches(model, config, device, inference_queue, pipes_to_workers, stop_processing):
     """Process batches of inputs from the self-play games"""
 
-    model = model.to(device)
+    model.to(device)
     while not stop_processing.is_set():
-        try:
-            # Pause then get the next batch of inputs
-            time.sleep(config.inference_interval)
-            ids, batch = get_batch(inference_queue, device)
-            if not ids:
-                continue
 
-            # Query the model for the batch of inputs
-            with torch.no_grad():
-                policies, values = model(batch)
-
-            # Send the outputs to the appropriate worker
-            for i, id in enumerate(ids):
-                response = (policies[i].cpu().tolist(), values[i].cpu().tolist())
-                pipes_to_workers[id].send(response)
-
-        except Empty or EOFError:
+        # Pause then get the next batch of inputs
+        time.sleep(config.inference_interval)
+        ids, batch = get_batch(inference_queue, device)
+        if not ids:
             continue
+
+        # Query the model for the batch of inputs
+        with torch.no_grad():
+            policies, values = model(batch)
+
+        # Send the outputs to the appropriate worker
+        for i, id in enumerate(ids):
+            response = (policies[i].cpu().tolist(), values[i].cpu().tolist())
+            pipes_to_workers[id].send(response)
 
 
 def save(game, buffer: ReplayBuffer,):
@@ -73,7 +71,7 @@ def save(game, buffer: ReplayBuffer,):
     # Allocate space for the data
     history, policies, values = game
     num_moves = len(history)
-    logging.info(f"Saving game with {num_moves} moves to the replay buffer")
+    logging.debug(f"Saving game with {num_moves} moves to the replay buffer")
 
     state_data = torch.zeros(num_moves, 5, DIM, DIM, dtype=torch.float32)
     policy_data = torch.zeros(num_moves, DIM * DIM, dtype=torch.float32)
@@ -111,7 +109,6 @@ def save(game, buffer: ReplayBuffer,):
 
 def train(step, model, buffer, optimizer, policy_loss, value_loss, device, stats):
     """Train the model on a batch of data from the replay buffer"""
-    logging.info(f"Training step: {step}")
 
     # Get a batch of data from the replay buffer
     batch = buffer.sample()
@@ -143,6 +140,42 @@ def train(step, model, buffer, optimizer, policy_loss, value_loss, device, stats
     stats.to_csv(STATS_PATH)
 
 
+def start_inference_process(model, config, device, stop_processing):
+    """Cleanly start process for inference
+
+    Reinitializes the queues and pipes for the inference process each
+    time to try and manage resources cleanly.
+    """
+
+    # Create the queues and pipes
+    manager = mp.Manager()
+    request_queue = manager.Queue()
+    pipes_to_model = []
+    pipes_to_workers = []
+    for i in range(config.num_workers):
+        a, b = mp.Pipe()
+        pipes_to_model.append(a)
+        pipes_to_workers.append(b)
+
+    # Start it
+    stop_processing.clear()
+    process = mp.Process(
+        target=process_inference_batches,
+        args=(model, config, device, request_queue, pipes_to_workers, stop_processing)
+    )
+    process.start()
+
+    return process, request_queue, pipes_to_model, manager
+
+
+def stop_inference_process(process, manager, stop_event):
+    """Clean up the inference process"""
+
+    stop_event.set()
+    process.join()
+    manager.shutdown()
+
+
 def main(num_cpus):
     """Train the model
 
@@ -169,35 +202,27 @@ def main(num_cpus):
         batch_size=config.batch_size
     )
 
-    # Set up queues and multiprocessing for self-play
-    manager = mp.Manager()
-    inference_queue = manager.Queue()
-    pipes_to_model = []
-    pipes_to_workers = []
-    for i in range(config.num_workers):
-        a, b = mp.Pipe()
-        pipes_to_model.append(a)
-        pipes_to_workers.append(b)
-    stop_processing = mp.Event()
-    inference_process = mp.Process(target=process_inference_batches, args=(model, config, device, inference_queue, pipes_to_workers, stop_processing))
-    inference_process.start()
-    model = model.to(device)
-
     # Set up stats for tracking training progress
     stats = pd.DataFrame(columns=["round", "loss", "value_loss", "policy_loss", "buffer_size"])
     training_round = 0
     num_saves = 0
 
     # Train the model
-    training_round = 0
-    while training_round < config.training_rounds:
+    stop_processing = mp.Event()
+    for round in trange(config.training_rounds):
+
+        # Start the process for handling batches of inference requests
+        ip, request_queue, pipes_to_model, manager = start_inference_process(model, config, device, stop_processing)
 
         # Generate training data through self-play
         with mp.Pool(config.num_workers) as pool:
             game_data = pool.starmap(
                 generate_game_data,
-                [(config.games_per_worker, id, config, inference_queue, pipes_to_model[id]) for id in range(config.num_workers)]
+                [(config.games_per_worker, id, config, request_queue, pipes_to_model[id]) for id in range(config.num_workers)]
             )
+
+        # Stop processing inference requests, and clean up
+        stop_inference_process(ip, manager, stop_processing)
 
         # Save the game data to the replay buffer
         for worker_games in game_data:
@@ -205,15 +230,15 @@ def main(num_cpus):
                 save(game, buffer)
 
         # Train the model
-        for step in range(config.training_steps):
+        model.to(device)
+        pbar = trange(config.training_steps, desc=f"Training round {round}", leave=False)
+        for step in trange(config.training_steps):
             train(step, model, buffer, optimizer, policy_loss, value_loss, device, stats)
-        torch.save(model, f"{MODEL_PATH}/model_{training_round}.pt")
-        training_round += 1
+        pbar.close()
+        model.to('cpu')
+        torch.save(model, f"{MODEL_PATH}/model_{round}.pt")
 
     # Clean up
-    stop_processing.set()
-    inference_process.join()
-    manager.shutdown()
     logging.info("Training complete")
 
 
@@ -235,7 +260,7 @@ class Config:
         exploration_fraction = 0.25
     """
 
-    def __init__(self, num_cpus=4):
+    def __init__(self, num_cpus=1):
         self.training_rounds = 2
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
@@ -257,7 +282,7 @@ class Config:
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    num_cpus = int(os.environ.get("SLURM_NPROCS", 4))
+    num_cpus = int(os.environ.get("SLURM_NPROCS", 2))
     logging.info(f"Number of CPUs: {num_cpus}")
 
     main(num_cpus)
