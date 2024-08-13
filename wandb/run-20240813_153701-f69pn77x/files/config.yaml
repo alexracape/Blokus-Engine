@@ -1,0 +1,72 @@
+wandb_version: 1
+
+training_rounds:
+  desc: null
+  value: 1
+buffer_capacity:
+  desc: null
+  value: 500000
+learning_rate:
+  desc: null
+  value: 0.01
+batch_size:
+  desc: null
+  value: 64
+inference_interval:
+  desc: null
+  value: 0.001
+training_steps:
+  desc: null
+  value: 100
+num_workers:
+  desc: null
+  value: 2
+games_per_worker:
+  desc: null
+  value: 2
+nn_width:
+  desc: null
+  value: 32
+nn_depth:
+  desc: null
+  value: 5
+sims_per_move:
+  desc: null
+  value: 10
+sample_moves:
+  desc: null
+  value: 30
+c_base:
+  desc: null
+  value: 19652
+c_init:
+  desc: null
+  value: 1.25
+dirichlet_alpha:
+  desc: null
+  value: 0.3
+exploration_fraction:
+  desc: null
+  value: 0.25
+_wandb:
+  desc: null
+  value:
+    python_version: 3.10.2
+    cli_version: 0.17.6
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1723577821
+    t:
+      1:
+      - 1
+      - 55
+      - 105
+      3:
+      - 16
+      - 23
+      4: 3.10.2
+      5: 0.17.6
+      8:
+      - 5
+      13: darwin-arm64

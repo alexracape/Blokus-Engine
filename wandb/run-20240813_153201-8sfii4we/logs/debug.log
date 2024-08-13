@@ -1,0 +1,29 @@
+2024-08-13 15:32:01,138 INFO    MainThread:35538 [wandb_setup.py:_flush():76] Current SDK version is 0.17.6
+2024-08-13 15:32:01,138 INFO    MainThread:35538 [wandb_setup.py:_flush():76] Configure stats pid to 35538
+2024-08-13 15:32:01,138 INFO    MainThread:35538 [wandb_setup.py:_flush():76] Loading settings from /Users/alexracape/.config/wandb/settings
+2024-08-13 15:32:01,138 INFO    MainThread:35538 [wandb_setup.py:_flush():76] Loading settings from /Users/alexracape/Programming/blokus_backend/wandb/settings
+2024-08-13 15:32:01,138 INFO    MainThread:35538 [wandb_setup.py:_flush():76] Loading settings from environment variables: {}
+2024-08-13 15:32:01,138 INFO    MainThread:35538 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program_relpath': 'model/training.py', 'program_abspath': '/Users/alexracape/Programming/blokus_backend/model/training.py', 'program': '/Users/alexracape/Programming/blokus_backend/model/training.py'}
+2024-08-13 15:32:01,138 INFO    MainThread:35538 [wandb_setup.py:_flush():76] Applying login settings: {'api_key': '***REDACTED***'}
+2024-08-13 15:32:01,138 INFO    MainThread:35538 [wandb_setup.py:_flush():76] Applying login settings: {'api_key': '***REDACTED***'}
+2024-08-13 15:32:01,138 INFO    MainThread:35538 [wandb_setup.py:_flush():76] Applying login settings: {}
+2024-08-13 15:32:01,138 INFO    MainThread:35538 [wandb_init.py:_log_setup():521] Logging user logs to /Users/alexracape/Programming/blokus_backend/wandb/run-20240813_153201-8sfii4we/logs/debug.log
+2024-08-13 15:32:01,138 INFO    MainThread:35538 [wandb_init.py:_log_setup():522] Logging internal logs to /Users/alexracape/Programming/blokus_backend/wandb/run-20240813_153201-8sfii4we/logs/debug-internal.log
+2024-08-13 15:32:01,138 INFO    MainThread:35538 [wandb_init.py:init():559] calling init triggers
+2024-08-13 15:32:01,139 INFO    MainThread:35538 [wandb_init.py:init():566] wandb.init called with sweep_config: {}
+config: {'training_rounds': 1, 'buffer_capacity': 500000, 'learning_rate': 0.01, 'batch_size': 64, 'inference_interval': 0.001, 'training_steps': 100, 'num_workers': 2, 'games_per_worker': 2, 'nn_width': 32, 'nn_depth': 5, 'sims_per_move': 10, 'sample_moves': 30, 'c_base': 19652, 'c_init': 1.25, 'dirichlet_alpha': 0.3, 'exploration_fraction': 0.25}
+2024-08-13 15:32:01,139 INFO    MainThread:35538 [wandb_init.py:init():609] starting backend
+2024-08-13 15:32:01,139 INFO    MainThread:35538 [wandb_init.py:init():613] setting up manager
+2024-08-13 15:32:01,141 INFO    MainThread:35538 [backend.py:_multiprocessing_setup():105] multiprocessing start_methods=spawn,fork,forkserver, using: spawn
+2024-08-13 15:32:01,142 INFO    MainThread:35538 [wandb_init.py:init():621] backend started and connected
+2024-08-13 15:32:01,146 INFO    MainThread:35538 [wandb_init.py:init():716] updated telemetry
+2024-08-13 15:32:01,166 INFO    MainThread:35538 [wandb_init.py:init():749] communicating run to backend with 90.0 second timeout
+2024-08-13 15:32:01,359 ERROR   MainThread:35538 [wandb_init.py:init():775] encountered error: It appears that you do not have permission to access the requested resource. Please reach out to the project owner to grant you access. If you have the correct permissions, verify that there are no issues with your networking setup.(Error 403: Forbidden)
+2024-08-13 15:32:01,360 ERROR   MainThread:35538 [wandb_init.py:init():1187] error in wandb.init()
+Traceback (most recent call last):
+  File "/Users/alexracape/Programming/blokus_backend/venv/lib/python3.10/site-packages/wandb/sdk/wandb_init.py", line 1177, in init
+    return wi.init()
+  File "/Users/alexracape/Programming/blokus_backend/venv/lib/python3.10/site-packages/wandb/sdk/wandb_init.py", line 781, in init
+    raise error
+wandb.errors.CommError: It appears that you do not have permission to access the requested resource. Please reach out to the project owner to grant you access. If you have the correct permissions, verify that there are no issues with your networking setup.(Error 403: Forbidden)
+2024-08-13 15:32:02,564 WARNING MsgRouterThr:35538 [router.py:message_loop():77] message_loop has been closed

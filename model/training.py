@@ -4,8 +4,7 @@ import os
 import time
 from queue import Empty
 
-import numpy as np
-import pandas as pd
+import wandb
 from tqdm import trange
 import torch
 from torchrl.data import ReplayBuffer, LazyTensorStorage
@@ -15,7 +14,6 @@ from blokus_self_play import generate_game_data
 from resnet import ResNet
 
 DIM = 20
-STATS_PATH = "./data/training_stats.csv"
 MODEL_PATH = "./models"
 
 @tensorclass
@@ -103,7 +101,7 @@ def save(game, buffer: ReplayBuffer,):
     buffer.extend(data)
 
 
-def train(step, model, buffer, optimizer, policy_loss, value_loss, device, stats):
+def train(step, model, buffer, optimizer, policy_loss, value_loss, device):
     """Train the model on a batch of data from the replay buffer"""
 
     # Get a batch of data from the replay buffer
@@ -122,18 +120,7 @@ def train(step, model, buffer, optimizer, policy_loss, value_loss, device, stats
     optimizer.step()
 
     # Store training statistics
-    row = pd.DataFrame([{
-        "round": step,
-        "loss": loss.item(),
-        "value_loss": value_loss.item(),
-        "policy_loss": policy_loss.item(),
-        "buffer_size": len(buffer)
-    }])
-    if stats.empty:
-        stats = row
-    else:
-        stats = pd.concat([stats, row])
-    stats.to_csv(STATS_PATH)
+    wandb.log({"policy_loss": policy_loss, "value_loss": value_loss}, step=step)
 
 
 def main(num_cpus):
@@ -156,16 +143,16 @@ def main(num_cpus):
     policy_loss = torch.nn.CrossEntropyLoss().to(device)
     value_loss = torch.nn.MSELoss().to(device)
 
+    # Configure Weights and Biases
+    wandb.login()
+    wandb.init(project="blokus", config=config.to_dict())
+    wandb.watch(model, log_freq=100)
+
     # Set up replay buffer
     buffer = ReplayBuffer(
         storage=LazyTensorStorage(config.buffer_capacity),
         batch_size=config.batch_size
     )
-
-    # Set up stats for tracking training progress
-    stats = pd.DataFrame(columns=["round", "loss", "value_loss", "policy_loss", "buffer_size"])
-    training_round = 0
-    num_saves = 0
 
     # Create the queues and pipes
     manager = mp.Manager()
@@ -199,7 +186,7 @@ def main(num_cpus):
         # Train the model
         pbar = trange(config.training_steps, desc=f"Training round {round}", leave=False)
         for step in trange(config.training_steps):
-            train(step, model, buffer, optimizer, policy_loss, value_loss, device, stats)
+            train(step, model, buffer, optimizer, policy_loss, value_loss, device)
         pbar.close()
         torch.save(model.state_dict(), f"{MODEL_PATH}/model_{round}.pt")
 
@@ -226,23 +213,25 @@ class Config:
     """
 
     def __init__(self, num_cpus=1):
-        self.training_rounds = 2
+        self.training_rounds = 1
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
         self.batch_size = 64
         self.inference_interval = .001  # seconds
-        self.training_steps = 10
+        self.training_steps = 100
         self.num_workers = num_cpus
         self.games_per_worker = 2
-        self.rounds = 2
         self.nn_width = 32
-        self.nn_depth = 2
-        self.sims_per_move = 5
+        self.nn_depth = 5
+        self.sims_per_move = 10
         self.sample_moves = 30
         self.c_base = 19652
         self.c_init = 1.25
         self.dirichlet_alpha = 0.3
         self.exploration_fraction = 0.25
+
+    def to_dict(self):
+        return self.__dict__
 
 
 if __name__ == '__main__':
