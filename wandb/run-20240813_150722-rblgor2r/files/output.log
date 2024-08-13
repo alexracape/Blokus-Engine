@@ -1,9 +1,0 @@
-
-  0%|                                                                                                                                           | 0/100 [00:00<?, ?it/s]
-  0%|                                                                                                                                             | 0/1 [00:35<?, ?it/s]
-Traceback (most recent call last):                                                                                                              | 0/100 [00:00<?, ?it/s]
-  File "/Users/alexracape/Programming/blokus_backend/model/training.py", line 244, in <module>
-    main(num_cpus)
-  File "/Users/alexracape/Programming/blokus_backend/model/training.py", line 191, in main
-    train(step, model, buffer, optimizer, policy_loss, value_loss, device, stats)
-NameError: name 'stats' is not defined
