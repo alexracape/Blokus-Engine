@@ -41,10 +41,12 @@ class ResNet(nn.Module):
     outcome of the game for each player. The value is between 0 and 1.
     """
 
-    def __init__(self, blocks, width):
+    def __init__(self, blocks, width, custom_filters=False):
         super(ResNet, self).__init__()
         self.blocks = blocks
         self.width = width
+        self.custom_filters = custom_filters
+        self.piece_filters = []
 
         self.input = nn.Conv2d(5, width, kernel_size=3, padding=1)
         self.res_blocks = nn.ModuleList([ResidualBlock(width, width) for _ in range(blocks)])

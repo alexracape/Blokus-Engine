@@ -138,7 +138,7 @@ def main(num_cpus):
     logging.info(f"Using device: {device}")
 
     # Create the model, optimizer, and loss
-    model = ResNet(config.nn_depth, config.nn_width).to(device)
+    model = ResNet(config.nn_depth, config.nn_width, config.custom_filters).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     policy_loss = torch.nn.CrossEntropyLoss().to(device)
     value_loss = torch.nn.MSELoss().to(device)
@@ -214,6 +214,7 @@ class Config:
 
     def __init__(self, num_cpus=1):
         self.training_rounds = 1
+
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
         self.batch_size = 64
@@ -221,8 +222,11 @@ class Config:
         self.training_steps = 100
         self.num_workers = num_cpus
         self.games_per_worker = 2
+
+        self.custom_filters = True
         self.nn_width = 32
         self.nn_depth = 5
+
         self.sims_per_move = 10
         self.sample_moves = 30
         self.c_base = 19652
