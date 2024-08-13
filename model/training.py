@@ -34,7 +34,7 @@ def get_batch(queue, device):
             input = torch.tensor(input).reshape(5, DIM, DIM).to(device)
             ids.append(id)
             items.append(input)
-        except Empty:
+        except Empty as e:
             break
 
     if not ids:
@@ -43,26 +43,22 @@ def get_batch(queue, device):
     return ids, torch.stack(items)
 
 
-def process_inference_batches(model, config, device, inference_queue, pipes_to_workers, stop_processing):
+def handle_inference_batch(model, device, inference_queue, pipes_to_workers):
     """Process batches of inputs from the self-play games"""
 
-    model.to(device)
-    while not stop_processing.is_set():
+    # Pause then get the next batch of inputs
+    ids, batch = get_batch(inference_queue, device)
+    if not ids:
+        return
 
-        # Pause then get the next batch of inputs
-        time.sleep(config.inference_interval)
-        ids, batch = get_batch(inference_queue, device)
-        if not ids:
-            continue
+    # Query the model for the batch of inputs
+    with torch.no_grad():
+        policies, values = model(batch)
 
-        # Query the model for the batch of inputs
-        with torch.no_grad():
-            policies, values = model(batch)
-
-        # Send the outputs to the appropriate worker
-        for i, id in enumerate(ids):
-            response = (policies[i].cpu().tolist(), values[i].cpu().tolist())
-            pipes_to_workers[id].send(response)
+    # Send the outputs to the appropriate worker
+    for i, id in enumerate(ids):
+        response = (policies[i].cpu().tolist(), values[i].cpu().tolist())
+        pipes_to_workers[id].send(response)
 
 
 def save(game, buffer: ReplayBuffer,):
@@ -140,42 +136,6 @@ def train(step, model, buffer, optimizer, policy_loss, value_loss, device, stats
     stats.to_csv(STATS_PATH)
 
 
-def start_inference_process(model, config, device, stop_processing):
-    """Cleanly start process for inference
-
-    Reinitializes the queues and pipes for the inference process each
-    time to try and manage resources cleanly.
-    """
-
-    # Create the queues and pipes
-    manager = mp.Manager()
-    request_queue = manager.Queue()
-    pipes_to_model = []
-    pipes_to_workers = []
-    for i in range(config.num_workers):
-        a, b = mp.Pipe()
-        pipes_to_model.append(a)
-        pipes_to_workers.append(b)
-
-    # Start it
-    stop_processing.clear()
-    process = mp.Process(
-        target=process_inference_batches,
-        args=(model, config, device, request_queue, pipes_to_workers, stop_processing)
-    )
-    process.start()
-
-    return process, request_queue, pipes_to_model, manager
-
-
-def stop_inference_process(process, manager, stop_event):
-    """Clean up the inference process"""
-
-    stop_event.set()
-    process.join()
-    manager.shutdown()
-
-
 def main(num_cpus):
     """Train the model
 
@@ -191,7 +151,7 @@ def main(num_cpus):
     logging.info(f"Using device: {device}")
 
     # Create the model, optimizer, and loss
-    model = ResNet(config.nn_depth, config.nn_width)
+    model = ResNet(config.nn_depth, config.nn_width).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     policy_loss = torch.nn.CrossEntropyLoss().to(device)
     value_loss = torch.nn.MSELoss().to(device)
@@ -207,36 +167,41 @@ def main(num_cpus):
     training_round = 0
     num_saves = 0
 
-    # Train the model
-    stop_processing = mp.Event()
+    # Create the queues and pipes
+    manager = mp.Manager()
+    request_queue = manager.Queue()
+    pipes_to_model = []
+    pipes_to_workers = []
+    for i in range(config.num_workers):
+        a, b = mp.Pipe()
+        pipes_to_model.append(a)
+        pipes_to_workers.append(b)
+
     for round in trange(config.training_rounds):
 
-        # Start the process for handling batches of inference requests
-        ip, request_queue, pipes_to_model, manager = start_inference_process(model, config, device, stop_processing)
-
-        # Generate training data through self-play
+        # Generate spawn asynchronous self-play processes
         with mp.Pool(config.num_workers) as pool:
-            game_data = pool.starmap(
+            game_data = pool.starmap_async(
                 generate_game_data,
                 [(config.games_per_worker, id, config, request_queue, pipes_to_model[id]) for id in range(config.num_workers)]
             )
 
-        # Stop processing inference requests, and clean up
-        stop_inference_process(ip, manager, stop_processing)
+            # Start handling inference requests
+            while not game_data.ready():
+                time.sleep(config.inference_interval)
+                handle_inference_batch(model, device, request_queue, pipes_to_workers)
 
-        # Save the game data to the replay buffer
-        for worker_games in game_data:
-            for game in worker_games:
-                save(game, buffer)
+            # Save the game data to the replay buffer
+            for worker_games in game_data.get():
+                for game in worker_games:
+                    save(game, buffer)
 
         # Train the model
-        model.to(device)
         pbar = trange(config.training_steps, desc=f"Training round {round}", leave=False)
         for step in trange(config.training_steps):
             train(step, model, buffer, optimizer, policy_loss, value_loss, device, stats)
         pbar.close()
-        model.to('cpu')
-        torch.save(model, f"{MODEL_PATH}/model_{round}.pt")
+        torch.save(model.state_dict(), f"{MODEL_PATH}/model_{round}.pt")
 
     # Clean up
     logging.info("Training complete")
