@@ -220,7 +220,7 @@ class Config:
     """
 
     def __init__(self, num_cpus=1):
-        self.training_rounds = 1
+        self.training_rounds = 2
 
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
