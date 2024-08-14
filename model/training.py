@@ -92,6 +92,10 @@ def save(game, buffer: ReplayBuffer,):
             row, col = action // DIM, action % DIM
             state_data[i, 4, row, col] = 1
 
+        # Rotate state and policy so perspective is the same
+        state_data[i] = torch.rot90(state_data[i], k=player, dims=(1, 2))
+        policy_data[i] = torch.rot90(policy_data[i].reshape(DIM, DIM), k=player).reshape(-1)
+
     data = Data(
         states = state_data,
         policies = policy_data,
@@ -164,6 +168,8 @@ def main(num_cpus):
         pipes_to_model.append(a)
         pipes_to_workers.append(b)
 
+    # Train the model
+    global_step = 0
     for round in trange(config.training_rounds):
 
         # Generate spawn asynchronous self-play processes
@@ -186,7 +192,8 @@ def main(num_cpus):
         # Train the model
         pbar = trange(config.training_steps, desc=f"Training round {round}", leave=False)
         for step in trange(config.training_steps):
-            train(step, model, buffer, optimizer, policy_loss, value_loss, device)
+            train(global_step, model, buffer, optimizer, policy_loss, value_loss, device)
+            global_step += 1
         pbar.close()
         torch.save(model.state_dict(), f"{MODEL_PATH}/model_{round}.pt")
 
@@ -217,17 +224,17 @@ class Config:
 
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
-        self.batch_size = 64
+        self.batch_size = 512
         self.inference_interval = .001  # seconds
-        self.training_steps = 100
-        self.num_workers = num_cpus
-        self.games_per_worker = 2
+        self.training_steps = 10000
+        self.num_workers = num_cpus * 2
+        self.games_per_worker = 1
 
         self.custom_filters = True
-        self.nn_width = 32
-        self.nn_depth = 5
+        self.nn_width = 256
+        self.nn_depth = 20
 
-        self.sims_per_move = 10
+        self.sims_per_move = 100
         self.sample_moves = 30
         self.c_base = 19652
         self.c_init = 1.25
