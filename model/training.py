@@ -23,13 +23,12 @@ class Data:
     scores: torch.Tensor
 
 
-def get_batch(queue, device):
+def get_batch(size, queue, device):
     ids = []
     items = []
-    while True:
+    for _ in range(size):
         try:
             id, input = queue.get_nowait()
-            input = torch.tensor(input).reshape(5, DIM, DIM).to(device)
             ids.append(id)
             items.append(input)
         except Empty as e:
@@ -38,14 +37,19 @@ def get_batch(queue, device):
     if not ids:
         return [], torch.tensor([])
 
-    return ids, torch.stack(items)
+    return ids, torch.tensor(items).view(-1, 5, DIM, DIM).to(device)
 
 
 def handle_inference_batch(model, device, inference_queue, pipes_to_workers):
     """Process batches of inputs from the self-play games"""
 
+    num_workers = len(pipes_to_workers)
+    batch_size = num_workers // 2
+    while inference_queue.qsize() < batch_size:
+        time.sleep(.0001)
+
     # Pause then get the next batch of inputs
-    ids, batch = get_batch(inference_queue, device)
+    ids, batch = get_batch(batch_size, inference_queue, device)
     if not ids:
         return
 
@@ -181,7 +185,6 @@ def main(num_cpus):
 
             # Start handling inference requests
             while not game_data.ready():
-                time.sleep(config.inference_interval)
                 handle_inference_batch(model, device, request_queue, pipes_to_workers)
 
             # Save the game data to the replay buffer
@@ -225,9 +228,8 @@ class Config:
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
         self.batch_size = 512
-        self.inference_interval = .001  # seconds
         self.training_steps = 10000
-        self.num_workers = num_cpus * 2
+        self.num_workers = num_cpus * 4
         self.games_per_worker = 1
 
         self.custom_filters = True
