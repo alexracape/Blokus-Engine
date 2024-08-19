@@ -1,3 +1,4 @@
+import argparse
 import multiprocessing as mp
 import logging
 import os
@@ -5,7 +6,7 @@ import time
 from queue import Empty
 
 import wandb
-from tqdm import trange
+from tqdm import trange, tqdm
 import torch
 from torchrl.data import ReplayBuffer, LazyTensorStorage
 from tensordict import tensorclass
@@ -34,24 +35,53 @@ def get_batch(size, queue, device):
         except Empty as e:
             break
 
-    if not ids:
-        return [], torch.tensor([])
+    return ids, torch.tensor(items).view(-1, 5, DIM, DIM).to(device)
+
+
+def empty_queue(queue, device):
+    ids = []
+    items = []
+    while True:
+        try:
+            id, input = queue.get_nowait()
+            ids.append(id)
+            items.append(input)
+        except Empty as e:
+            break
 
     return ids, torch.tensor(items).view(-1, 5, DIM, DIM).to(device)
 
 
 def handle_inference_batch(model, device, inference_queue, pipes_to_workers):
-    """Process batches of inputs from the self-play games"""
+    """Process batches of inputs from the self-play games
 
+    Tries to create a batch of size num_workers // 2 from the inference queue.
+    If this runs for too long, there are likely stragglers in the queue and we
+    should just empty the queue with what is left. All batches are sent to the
+    GPU for processing and the outputs are sent back to the appropriate worker.
+    """
+
+    # Wait for a batch of inputs to be available
     num_workers = len(pipes_to_workers)
     batch_size = num_workers // 2
+    elapsed_time = 0
+    interval = .0001
     while inference_queue.qsize() < batch_size:
-        time.sleep(.0001)
+        time.sleep(interval)
+        elapsed_time += interval
+        if elapsed_time > 100 * interval:
+            break
 
-    # Pause then get the next batch of inputs
-    ids, batch = get_batch(batch_size, inference_queue, device)
-    if not ids:
-        return
+    # Retrieve the batch of inputs from the queue and send them to the GPU
+    if inference_queue.qsize() < batch_size:
+        ids, batch = empty_queue(inference_queue, device)
+        print(f"Emptying queue with {len(ids)} items")
+    else:
+        ids, batch = get_batch(batch_size, inference_queue, device)
+
+    num_requests = len(ids)
+    if num_requests == 0:
+        return 0
 
     # Query the model for the batch of inputs
     with torch.no_grad():
@@ -61,6 +91,8 @@ def handle_inference_batch(model, device, inference_queue, pipes_to_workers):
     for i, id in enumerate(ids):
         response = (policies[i].cpu().tolist(), values[i].cpu().tolist())
         pipes_to_workers[id].send(response)
+
+    return num_requests
 
 
 def save(game, buffer: ReplayBuffer,):
@@ -109,7 +141,7 @@ def save(game, buffer: ReplayBuffer,):
     buffer.extend(data)
 
 
-def train(step, model, buffer, optimizer, policy_loss, value_loss, device):
+def train(step, model, buffer, optimizer, policy_loss, value_loss, device, testing):
     """Train the model on a batch of data from the replay buffer"""
 
     # Get a batch of data from the replay buffer
@@ -128,10 +160,11 @@ def train(step, model, buffer, optimizer, policy_loss, value_loss, device):
     optimizer.step()
 
     # Store training statistics
-    wandb.log({"policy_loss": policy_loss, "value_loss": value_loss}, step=step)
+    if not testing:
+        wandb.log({"policy_loss": policy_loss, "value_loss": value_loss}, step=step)
 
 
-def main(num_cpus):
+def main():
     """Train the model
 
     Creates the model then spawns multiple processes to generate
@@ -140,10 +173,22 @@ def main(num_cpus):
     reaches a certain number of training steps.
     """
 
+    # Parse args for number of CPUs and testing mode
+    parser = argparse.ArgumentParser(description="Your program description here")
+    parser.add_argument('--test', action='store_true', help="Run the program in testing mode")
+    parser.add_argument('--cpus', type=int, default=1, help="Number of CPUs to use (default: 1)")
+    args = parser.parse_args()
+    logging.info(f"Using {args.cpus} CPUs")
+    logging.info(f"Running in {'test' if args.test else 'full power'} mode")
+
     # Load environment variables
-    config = Config(num_cpus)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f"Using device: {device}")
+    if args.test:
+        config = TestConfig(args.cpus)
+    else:
+        config = Config(args.cpus)
+
 
     # Create the model, optimizer, and loss
     model = ResNet(config.nn_depth, config.nn_width, config.custom_filters).to(device)
@@ -152,9 +197,10 @@ def main(num_cpus):
     value_loss = torch.nn.MSELoss().to(device)
 
     # Configure Weights and Biases
-    wandb.login()
-    wandb.init(project="blokus", config=config.to_dict())
-    wandb.watch(model, log_freq=100)
+    if not args.test:
+        wandb.login()
+        wandb.init(project="blokus", config=config.to_dict())
+        wandb.watch(model, log_freq=100)
 
     # Set up replay buffer
     buffer = ReplayBuffer(
@@ -162,19 +208,19 @@ def main(num_cpus):
         batch_size=config.batch_size
     )
 
-    # Create the queues and pipes
-    manager = mp.Manager()
-    request_queue = manager.Queue()
-    pipes_to_model = []
-    pipes_to_workers = []
-    for i in range(config.num_workers):
-        a, b = mp.Pipe()
-        pipes_to_model.append(a)
-        pipes_to_workers.append(b)
-
     # Train the model
     global_step = 0
     for round in trange(config.training_rounds):
+
+        # Create the queues and pipes
+        manager = mp.Manager()
+        request_queue = manager.Queue()
+        pipes_to_model = []
+        pipes_to_workers = []
+        for i in range(config.num_workers):
+            a, b = mp.Pipe()
+            pipes_to_model.append(a)
+            pipes_to_workers.append(b)
 
         # Generate spawn asynchronous self-play processes
         with mp.Pool(config.num_workers) as pool:
@@ -184,8 +230,12 @@ def main(num_cpus):
             )
 
             # Start handling inference requests
+            total_requests_ish = config.games_per_worker * config.num_workers * (config.sims_per_move + 2) * DIM**2
+            pbar = tqdm(total=total_requests_ish, desc=f"Self-Play Requests Round {round}")
             while not game_data.ready():
-                handle_inference_batch(model, device, request_queue, pipes_to_workers)
+                num_requests = handle_inference_batch(model, device, request_queue, pipes_to_workers)
+                pbar.update(num_requests)
+            pbar.close()
 
             # Save the game data to the replay buffer
             for worker_games in game_data.get():
@@ -193,11 +243,9 @@ def main(num_cpus):
                     save(game, buffer)
 
         # Train the model
-        pbar = trange(config.training_steps, desc=f"Training round {round}", leave=False)
-        for step in trange(config.training_steps):
-            train(global_step, model, buffer, optimizer, policy_loss, value_loss, device)
+        for step in trange(config.training_steps, desc=f"Training round {round}", leave=False):
+            train(global_step, model, buffer, optimizer, policy_loss, value_loss, device, args.test)
             global_step += 1
-        pbar.close()
         torch.save(model.state_dict(), f"{MODEL_PATH}/model_{round}.pt")
 
     # Clean up
@@ -222,8 +270,8 @@ class Config:
         exploration_fraction = 0.25
     """
 
-    def __init__(self, num_cpus=1):
-        self.training_rounds = 2
+    def __init__(self, num_cpus):
+        self.training_rounds = 10
 
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
@@ -247,9 +295,31 @@ class Config:
         return self.__dict__
 
 
+class TestConfig(Config):
+    """Configuration with testing values to speed things up"""
+
+    def __init__(self, num_cpus):
+        self.training_rounds = 2
+
+        self.buffer_capacity = 500000
+        self.learning_rate = 0.01
+        self.batch_size = 64
+        self.training_steps = 10
+        self.num_workers = num_cpus * 4
+        self.games_per_worker = 1
+
+        self.custom_filters = True
+        self.nn_width = 16
+        self.nn_depth = 2
+
+        self.sims_per_move = 2
+        self.sample_moves = 30
+        self.c_base = 19652
+        self.c_init = 1.25
+        self.dirichlet_alpha = 0.3
+        self.exploration_fraction = 0.25
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    num_cpus = int(os.environ.get("SLURM_NPROCS", 2))
-    logging.info(f"Number of CPUs: {num_cpus}")
-
-    main(num_cpus)
+    main()
