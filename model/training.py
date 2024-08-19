@@ -1,5 +1,5 @@
 import argparse
-import multiprocessing as mp
+import torch.multiprocessing as mp
 import logging
 import os
 import time
@@ -43,7 +43,7 @@ def empty_queue(queue, device):
     items = []
     while True:
         try:
-            id, input = queue.get_nowait()
+            id, input = queue.get(block=False)
             ids.append(id)
             items.append(input)
         except Empty as e:
@@ -215,23 +215,23 @@ def main():
 
         # Create the queues and pipes
         manager = mp.Manager()
-        request_queue = manager.Queue()
+        request_queue = manager.Queue(maxsize=config.cpus * config.games_per_cpu)
         pipes_to_model = []
         pipes_to_workers = []
-        for i in range(config.num_workers):
+        for i in range(config.games_per_round()):
             a, b = mp.Pipe()
             pipes_to_model.append(a)
             pipes_to_workers.append(b)
 
         # Generate spawn asynchronous self-play processes
-        with mp.Pool(config.num_workers) as pool:
+        with mp.Pool(config.cpus) as pool:
             game_data = pool.starmap_async(
                 generate_game_data,
-                [(config.games_per_worker, id, config, request_queue, pipes_to_model[id]) for id in range(config.num_workers)]
+                [(config.games_per_worker, id, config, request_queue, pipes_to_model[id]) for id in range(config.games_per_round())]
             )
 
             # Start handling inference requests
-            total_requests_ish = config.games_per_worker * config.num_workers * (config.sims_per_move + 2) * DIM**2
+            total_requests_ish = config.requests_per_round()
             pbar = tqdm(total=total_requests_ish, desc=f"Self-Play Requests Round {round}")
             while not game_data.ready():
                 num_requests = handle_inference_batch(model, device, request_queue, pipes_to_workers)
@@ -278,7 +278,8 @@ class Config:
         self.learning_rate = 0.01
         self.batch_size = 512
         self.training_steps = 10000
-        self.num_workers = num_cpus * 4
+        self.cpus = num_cpus
+        self.games_per_cpu = 4
         self.games_per_worker = 1
 
         self.custom_filters = True
@@ -295,6 +296,12 @@ class Config:
     def to_dict(self):
         return self.__dict__
 
+    def games_per_round(self):
+        return self.cpus * self.games_per_cpu * self.games_per_worker
+
+    def requests_per_round(self):
+        return self.games_per_round() *  DIM**2 * (self.sims_per_move + 2)
+
 
 class TestConfig(Config):
     """Configuration with testing values to speed things up"""
@@ -306,7 +313,8 @@ class TestConfig(Config):
         self.learning_rate = 0.01
         self.batch_size = 64
         self.training_steps = 10
-        self.num_workers = num_cpus * 4
+        self.cpus = num_cpus
+        self.games_per_cpu = 4
         self.games_per_worker = 1
 
         self.custom_filters = True
