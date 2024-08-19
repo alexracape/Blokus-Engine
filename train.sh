@@ -9,4 +9,4 @@ pip install --upgrade --no-cache-dir blokus-engine
 pip install -r requirements.txt
 cd /home/aracape/Blokus-Engine
 
-python model/training.py -n $SLURM_NPROCS
+python model/training.py --cpus $SLURM_NPROCS
