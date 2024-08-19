@@ -61,24 +61,25 @@ def handle_inference_batch(model, device, inference_queue, pipes_to_workers):
     GPU for processing and the outputs are sent back to the appropriate worker.
     """
 
-    # Wait for a batch of inputs to be available
-    num_workers = len(pipes_to_workers)
-    batch_size = num_workers // 2
-    elapsed_time = 0
-    interval = .0001
-    while inference_queue.qsize() < batch_size:
-        time.sleep(interval)
-        elapsed_time += interval
-        if elapsed_time > 100 * interval:
-            break
+    # # Wait for a batch of inputs to be available
+    # num_workers = len(pipes_to_workers)
+    # batch_size = num_workers // 2
+    # elapsed_time = 0
+    # interval = .0001
+    # while inference_queue.qsize() < batch_size:
+    #     time.sleep(interval)
+    #     elapsed_time += interval
+    #     if elapsed_time > 100 * interval:
+    #         break
 
-    # Retrieve the batch of inputs from the queue and send them to the GPU
-    if inference_queue.qsize() < batch_size:
-        ids, batch = empty_queue(inference_queue, device)
-        print(f"Emptying queue with {len(ids)} items")
-    else:
-        ids, batch = get_batch(batch_size, inference_queue, device)
-
+    # # Retrieve the batch of inputs from the queue and send them to the GPU
+    # if inference_queue.qsize() < batch_size:
+    #     ids, batch = empty_queue(inference_queue, device)
+    #     print(f"Emptying queue with {len(ids)} items")
+    # else:
+    #     ids, batch = get_batch(batch_size, inference_queue, device)
+    time.sleep(.001)
+    ids, batch = empty_queue(inference_queue, device)
     num_requests = len(ids)
     if num_requests == 0:
         return 0
