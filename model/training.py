@@ -269,6 +269,9 @@ class Config:
         c_init = 1.25
         dirichlet_alpha = 0.3
         exploration_fraction = 0.25
+
+    ~2.5 hours per round right now
+    TODO: Figure out how to tune this
     """
 
     def __init__(self, num_cpus):
@@ -284,7 +287,7 @@ class Config:
 
         self.custom_filters = True
         self.nn_width = 256
-        self.nn_depth = 20
+        self.nn_depth = 10
 
         self.sims_per_move = 100
         self.sample_moves = 30
