@@ -251,7 +251,33 @@ fn mcts(
     Ok(action)
 }
 
-pub fn play_game(
+fn best_action(
+    game: &Game,
+    id: i32,
+    queue: &Bound<PyAny>,
+    pipe: &Bound<PyAny>,
+) -> Result<usize, String> {
+    let mut root = Node::new(0.0);
+    match evaluate(&mut root, game, queue, pipe, id) {
+        Ok(_) => (),
+        Err(e) => {
+            return Err(format!("Error evaluating root node: {:?}", e));
+        }
+    }
+
+    // Get child with highest prior probability
+    let mut highest_prior = 0.0;
+    let mut best_action = 0;
+    for (action, child) in &root.children {
+        if child.prior > highest_prior {
+            highest_prior = child.prior;
+            best_action = *action;
+        }
+    }
+    Ok(best_action)
+}
+
+pub fn training_game(
     config: &Config,
     inference_queue: &Bound<PyAny>,
     pipe: &Bound<PyAny>,
@@ -280,4 +306,39 @@ pub fn play_game(
     let values = game.get_payoff();
     let game_data = (game.history, policies, values.clone());
     Ok(game_data)
+}
+
+pub fn test_game(
+    id: i32,
+    model_queue: &Bound<PyAny>,
+    baseline_queue: &Bound<PyAny>,
+    pipe: &Bound<PyAny>,
+) -> Result<f32, String> {
+    let mut game = Game::reset();
+    // let mut policies: Vec<Vec<(i32, f32)>> = Vec::new();
+
+    // Run self-play to generate data
+    let mut queue;
+    while !game.is_terminal() {
+        // Set queue to query for this action
+        if game.current_player().unwrap() == 0 {
+            queue = model_queue;
+        } else {
+            queue = baseline_queue;
+        }
+
+        // Get action to take
+        let action = match best_action(&game, id, queue, pipe) {
+            Ok(a) => a,
+            Err(e) => {
+                println!("Error running MCTS: {:?}", e);
+                return Err("Error running MCTS".to_string());
+            }
+        };
+
+        // println!("Player {} --- {}", game.current_player(), action);
+        let _ = game.apply(action, None);
+    }
+    println!("Finished Game!");
+    Ok(game.get_payoff()[0])
 }

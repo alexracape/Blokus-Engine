@@ -11,7 +11,7 @@ import torch
 from torchrl.data import ReplayBuffer, LazyTensorStorage
 from tensordict import tensorclass
 
-from blokus_self_play import generate_game_data
+from blokus_self_play import play_training_game
 from resnet import ResNet
 
 DIM = 20
@@ -61,23 +61,6 @@ def handle_inference_batch(model, device, inference_queue, pipes_to_workers):
     GPU for processing and the outputs are sent back to the appropriate worker.
     """
 
-    # # Wait for a batch of inputs to be available
-    # num_workers = len(pipes_to_workers)
-    # batch_size = num_workers // 2
-    # elapsed_time = 0
-    # interval = .0001
-    # while inference_queue.qsize() < batch_size:
-    #     time.sleep(interval)
-    #     elapsed_time += interval
-    #     if elapsed_time > 100 * interval:
-    #         break
-
-    # # Retrieve the batch of inputs from the queue and send them to the GPU
-    # if inference_queue.qsize() < batch_size:
-    #     ids, batch = empty_queue(inference_queue, device)
-    #     print(f"Emptying queue with {len(ids)} items")
-    # else:
-    #     ids, batch = get_batch(batch_size, inference_queue, device)
     time.sleep(.001)
     ids, batch = empty_queue(inference_queue, device)
     num_requests = len(ids)
@@ -175,7 +158,7 @@ def main():
     """
 
     # Parse args for number of CPUs and testing mode
-    parser = argparse.ArgumentParser(description="Your program description here")
+    parser = argparse.ArgumentParser(description="Training the Blokus Deep Neural Network with Self-Play")
     parser.add_argument('--test', action='store_true', help="Run the program in testing mode")
     parser.add_argument('--cpus', type=int, default=1, help="Number of CPUs to use (default: 1)")
     args = parser.parse_args()
@@ -226,7 +209,7 @@ def main():
         # Generate spawn asynchronous self-play processes
         with mp.Pool(config.cpus) as pool:
             game_data = pool.starmap_async(
-                generate_game_data,
+                play_training_game,
                 [(config.games_per_worker, id, config, request_queue, pipes_to_model[id]) for id in range(config.games_per_round())]
             )
 
