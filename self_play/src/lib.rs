@@ -2,12 +2,12 @@ mod node;
 mod simulation;
 
 use pyo3::prelude::*;
-use simulation::play_game;
 use simulation::Config;
+use simulation::{test_game, training_game};
 
-/// Formats the sum of two numbers as string.
+/// Works with Pytorch model to generate self-play data
 #[pyfunction]
-fn generate_game_data(
+fn play_training_game(
     num_games: usize,
     id: i32,
     config: PyObject,
@@ -21,7 +21,7 @@ fn generate_game_data(
 
         let mut total = Vec::new();
         for _ in 0..num_games {
-            match play_game(&config, i_queue, r_queue, id) {
+            match training_game(&config, i_queue, r_queue, id) {
                 Ok(data) => total.push(data),
                 Err(e) => {
                     return Err(PyErr::new::<pyo3::exceptions::PyException, _>(format!(
@@ -35,7 +35,32 @@ fn generate_game_data(
     })
 }
 
+#[pyfunction]
+fn play_test_game(
+    id: i32,
+    model_queue: PyObject,
+    baseline_queue: PyObject,
+    pipe: PyObject,
+) -> PyResult<f32> {
+    Python::with_gil(|py| {
+        let model_queue = model_queue.bind(py);
+        let baseline_queue = baseline_queue.bind(py);
+        let response_pipe = pipe.bind(py);
+
+        match test_game(id, model_queue, baseline_queue, response_pipe) {
+            Ok(score) => Ok(score),
+            Err(e) => {
+                return Err(PyErr::new::<pyo3::exceptions::PyException, _>(format!(
+                    "{:?}",
+                    e
+                )))
+            }
+        }
+    })
+}
+
 #[pymodule]
 fn blokus_self_play(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(generate_game_data, m)?)
+    m.add_function(wrap_pyfunction!(play_training_game, m)?);
+    m.add_function(wrap_pyfunction!(play_test_game, m)?)
 }
