@@ -181,12 +181,12 @@ impl Board {
     }
 
     pub fn print_board(&self) {
-        let player1_emoji = "🟥"; // Example emoji for player 1
-        let player2_emoji = "🟦"; // Example emoji for player 2
-        let player3_emoji = "🟨"; // Example emoji for player 3
-        let player4_emoji = "🟩"; // Example emoji for player 4
-        let empty_emoji = "⬜"; // Example emoji for an empty space
-
+        let player1_emoji = "🟥";
+        let player2_emoji = "🟦";
+        let player3_emoji = "🟨";
+        let player4_emoji = "🟩";
+        let empty_emoji = "⬜";
+        let mut output = String::new();
         for i in 0..BOARD_SIZE {
             for j in 0..BOARD_SIZE {
                 let cell_value = self.board[i * BOARD_SIZE + j] & 0b0000_1111;
@@ -197,10 +197,11 @@ impl Board {
                     4 => player4_emoji,
                     _ => empty_emoji,
                 };
-                print!("{}", emoji_to_print);
+                output.push_str(emoji_to_print);
             }
-            println!();
+            output.push_str("\n");
         }
+        println!("{}", output);
     }
 }
 

@@ -265,6 +265,14 @@ fn best_action(
         }
     }
 
+    // Random move for baseline
+    if game.current_player().unwrap() != 0 {
+        let num_actions = root.children.len();
+        let index = rand::thread_rng().gen_range(0..num_actions);
+        let action = root.children.keys().nth(index).unwrap();
+        return Ok(*action);
+    }
+
     // Get child with highest prior probability
     let mut highest_prior = 0.0;
     let mut best_action = 0;
@@ -339,6 +347,7 @@ pub fn test_game(
         // println!("Player {} --- {}", game.current_player(), action);
         let _ = game.apply(action, None);
     }
-    println!("Finished Game!");
+    println!("Finished Game");
+    game.board.print_board();
     Ok(game.get_payoff()[0])
 }

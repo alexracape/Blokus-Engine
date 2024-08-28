@@ -15,7 +15,7 @@ from blokus_self_play import play_training_game
 from resnet import ResNet
 
 DIM = 20
-MODEL_PATH = "./models"
+MODEL_PATH = "./weights"
 
 @tensorclass
 class Data:
