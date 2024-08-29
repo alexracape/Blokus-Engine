@@ -1,5 +1,5 @@
 import argparse
-import torch.multiprocessing as mp
+import multiprocessing as mp
 import logging
 import os
 import time
@@ -207,7 +207,7 @@ def main():
             pipes_to_workers.append(b)
 
         # Generate spawn asynchronous self-play processes
-        with mp.Pool(config.cpus) as pool:
+        with mp.get_context("spawn").Pool(config.cpus) as pool:
             game_data = pool.starmap_async(
                 play_training_game,
                 [(config.games_per_worker, id, config, request_queue, pipes_to_model[id]) for id in range(config.games_per_round())]

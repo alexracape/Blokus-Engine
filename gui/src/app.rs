@@ -1,11 +1,8 @@
 use gloo_console as console;
-use tonic_web_wasm_client::Client;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::board::BlokusBoard;
-use crate::grpc::blokus_model_client::BlokusModelClient;
-use crate::grpc::StateRepresentation;
 use crate::pieces::PieceTray;
 use blokus::game::Game;
 
