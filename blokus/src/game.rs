@@ -4,6 +4,7 @@ use std::iter::zip;
 use crate::board::Board;
 use crate::pieces::{Piece, PieceVariant};
 
+const D: usize = 20;
 const BOARD_SPACES: usize = 400;
 
 /// Get the legal moves for a piece
@@ -70,6 +71,22 @@ fn get_tile_moves(board: &Board, player: usize) -> HashMap<usize, HashSet<(usize
 
     tile_rep
 }
+
+/// Rotates the tensor of boards 90 degrees to the left
+fn rotate_state(state: [[[bool; D]; D]; 5]) -> [[[bool; D]; D]; 5] {
+    let mut new_state = state.clone();
+    for i in 0..5 {
+        // Row
+        for j in 0..D {
+            for k in 0..D {
+                new_state[i][j][k] = state[i][k][D - j - 1];
+            }
+        }
+    }
+
+    new_state
+}
+
 
 #[derive(Clone)]
 pub struct Game {
@@ -271,5 +288,36 @@ impl Game {
 
     pub fn is_terminal(&self) -> bool {
         self.players_remaining.len() == 0
+    }
+
+    pub fn get_board_state(&self) -> [[[bool; D]; D]; 5] {
+        let current_player = self.current_player().unwrap();
+        let mut board_state = [[[false; D]; D]; 5];
+        let board = self.board.board;
+        for i in 0..BOARD_SPACES {
+            let player = (board[i] & 0b1111) as usize; // check if there is a player piece
+            if player != 0 {
+                // Player here is 1 indexed because 0 is empty
+                let player_board = (4 + (player - 1) - current_player) % 4; // orient to current player (0 indexed)
+                let row = i / D;
+                let col = i % D;
+                board_state[player_board][row][col] = true;
+            }
+        }
+
+        // Get rep for the legal spaces
+        let legal_moves = self.legal_tiles();
+        for tile in legal_moves {
+            let row = tile / D;
+            let col = tile % D;
+            board_state[4][row][col] = true;
+        }
+
+        // Rotate the board to the current player perspective
+        for _ in 0..current_player {
+            board_state = rotate_state(board_state);
+        }
+
+        board_state
     }
 }

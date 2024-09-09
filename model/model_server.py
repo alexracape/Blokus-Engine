@@ -1,27 +1,46 @@
 import logging
 import sys
+from typing import List
 
-from flask import Flask, request, jsonify
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import uvicorn
+
+import numpy as np
 import torch
 
-from resnet import ResNet
+from model.resnet import ResNet
 
-PORT = 8082
+PORT = 8000
 DIM = 20
 
-app = Flask(__name__)
+app = FastAPI()
+origins = [
+    "http://127.0.0.1:8080"
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ResNet(10, 256)
 
-@app.route('/process_request', methods=['POST'])
-def process_tensor():
-    # Get the JSON data from the request
-    data = request.json
-    if data is None or 'state' not in data:
-        return jsonify({"error": "Invalid data"}), 400
+
+class TensorData(BaseModel):
+    player: int
+    data: List[List[bool]]
+
+@app.post("/process_request")
+async def process_tensor(request: TensorData):
 
     # Convert the list of numbers to a numpy array
-    boards = torch.tensor(data['state'], dtype=torch.float32).reshape(5, DIM, DIM).to(device)
+    logging.debug(f"Received request: {request}")
+    boards = torch.tensor(request.data, dtype=torch.float32).to(device)
 
     # Query the model
     with torch.no_grad():
@@ -32,17 +51,15 @@ def process_tensor():
     result = {
         "policy": policy.tolist(),
         "values": values,
-        "message": "Data processed successfully"
+        "status": 200,
     }
+    return result
 
-    return jsonify(result), 200
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     path = sys.argv[1]
     model.load_state_dict(torch.load(path, weights_only=True, map_location=device))
     logging.info(f"Loaded model from {path}")
 
-    app.run(host='0.0.0.0', port=PORT)
+    uvicorn.run(app, host="0.0.0.0", port=PORT)

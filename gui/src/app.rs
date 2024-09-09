@@ -1,4 +1,7 @@
 use gloo_console as console;
+use reqwasm::http::Request;
+use serde::{Deserialize, Serialize};
+use serde_json;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
@@ -6,89 +9,91 @@ use crate::board::BlokusBoard;
 use crate::pieces::PieceTray;
 use blokus::game::Game;
 
-const SERVER_ADDRESS: &str = "http://0.0.0.0:8092";
-const BOARD_SIZE: usize = 400;
+const SERVER_ADDRESS: &str = "http://127.0.0.1:8000/process_request";
+const D: usize = 20;
 
-trait RpcRep {
-    fn get_rpc_rep(&self) -> StateRepresentation;
+#[derive(Serialize, Deserialize, Debug)]
+struct GameStateRequest {
+    player: usize,
+    data: [[[bool; D]; D]; 5],
 }
 
-impl RpcRep for Game {
-    /// Get a representation of the state for the neural network
-    /// This representation includes the board and the legal tiles
-    /// Oriented to the current player
-    fn get_rpc_rep(&self) -> StateRepresentation {
-        // Get rep for the pieces on the board
-        let current_player = self.current_player().expect("No current player");
-        let board = &self.board.board;
-        let mut board_rep = [[false; BOARD_SIZE]; 5];
-        for i in 0..BOARD_SIZE {
-            let player = (board[i] & 0b1111) as usize; // check if there is a player piece
-            let player_board = (4 + player - current_player) % 4; // orient to current player (0 indexed)
-            if player != 0 {
-                board_rep[player_board][i] = true;
+#[derive(Serialize, Deserialize, Debug)]
+struct GameStateResponse {
+    policy: Vec<f32>,
+    values: Vec<f32>,
+    status: i32,
+}
+
+fn print_rep(rep: [[[bool; D]; D]; 5]) {
+    let mut str_rep = String::new();
+    for i in 0..5 {
+        for j in 0..D {
+            for k in 0..D {
+                if rep[i][j][k] {
+                    str_rep.push_str("[X]");
+                } else {
+                    str_rep.push_str("[ ]");
+                }
             }
+            str_rep.push_str("\n");
         }
+        str_rep.push_str("\n");
+    }
+    console::log!(str_rep);
+}
 
-        // Get rep for the legal spaces
-        let legal_moves = self.legal_tiles();
-        console::log!(format!("Legal moves: {:?}", legal_moves));
-        for tile in legal_moves {
-            board_rep[4][tile] = true;
-        }
-
-        StateRepresentation {
-            boards: board_rep.into_iter().flat_map(|inner| inner).collect(),
-            player: current_player as i32,
-        }
+fn get_state_rep(game: &Game) -> GameStateRequest {
+    GameStateRequest {
+        player: game.current_player().unwrap(),
+        data: game.get_board_state(),
     }
 }
 
 /// Takes state and returns tile to place
-async fn get_ai_move(
-    state: &Game,
-    client: &mut BlokusModelClient<Client>,
-) -> Result<usize, String> {
-    let representation = state.get_rpc_rep();
-    let request = tonic::Request::new(representation);
+async fn get_ai_move(state: &Game) -> Result<usize, String> {
+    let request = get_state_rep(state);
+    print_rep(request.data);
+    let serialized_request = serde_json::to_string(&request).unwrap();
 
-    let prediction = client
-        .predict(request)
+    // Send POST request to FastAPI server
+    match Request::post(SERVER_ADDRESS)
+        .header("Content-Type", "application/json")
+        .body(serialized_request)
+        .send()
         .await
-        .map_err(|e| format!("Prediction error: {}", e))?
-        .into_inner();
-    let policy = prediction.policy;
-    console::log!(format!("Policy: {:?}", policy));
+    {
+        Ok(response) => {
+            let json_value = response.json().await.unwrap();
+            let response: GameStateResponse = serde_json::from_value(json_value).unwrap();
+            if response.status != 200 {
+                console::error!("AI failed to find a move");
+            }
+            let tile = response
+                .policy
+                .iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                .map(|(i, _)| i)
+                .expect("No policy found");
 
-    // Process policy and value as needed
-    let tile = policy
-        .iter()
-        .enumerate()
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-        .map(|(i, _)| i)
-        .expect("No policy found");
-
-    Ok(tile)
+            Ok(tile)
+        }
+        Err(e) => Err(format!("Failed to get AI move: {:?}", e)),
+    }
 }
 
 /// Applies AI moves to state after player has gone
-async fn handle_ai_moves(state: Game, client: &mut BlokusModelClient<Client>) -> Game {
+async fn handle_ai_moves(state: Game) -> Game {
     let mut next_state = state.clone();
     let mut current_ai = next_state.current_player().unwrap();
     while current_ai != 0 {
-        match get_ai_move(&next_state, client).await {
-            Ok(tile) => {
-                if let Err(e) = next_state.apply(tile, None) {
-                    console::error!("Failed to apply AI move: {:?}", e);
-                    break;
-                }
-                console::log!("AI placed piece at: {:?}", tile);
-            }
-            Err(e) => {
-                console::error!("Failed to get AI move: {:?}", e);
-                break;
-            }
+        let tile = get_ai_move(&next_state).await.unwrap();
+        if let Err(e) = next_state.apply(tile, None) {
+            console::error!("Failed to apply AI move: {:?}", e);
+            break;
         }
+        console::log!("AI placed piece at: {:?}", tile);
         current_ai = next_state.current_player().unwrap();
     }
 
@@ -123,9 +128,7 @@ pub fn App() -> Html {
             let state = state.clone();
             spawn_local({
                 async move {
-                    let mut client =
-                        BlokusModelClient::new(Client::new(SERVER_ADDRESS.to_string()));
-                    let new_state = handle_ai_moves(game, &mut client).await;
+                    let new_state = handle_ai_moves(game).await;
                     state.set(new_state);
                 }
             });
