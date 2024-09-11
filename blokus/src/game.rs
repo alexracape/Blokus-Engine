@@ -154,10 +154,7 @@ impl Game {
     // want to finish playing. This is really only used by the GUI rn
     pub fn apply(&mut self, tile: usize, piece_to_finish: Option<usize>) -> Result<(), String> {
         // Place piece on board
-        let current_player = match self.current_player() {
-            Some(p) => p,
-            None => return Err("No current player".to_string()),
-        };
+        let current_player = self.current_player()?;
         self.board.place_tile(tile, current_player);
         self.history.push((current_player as i32, tile as i32));
 
@@ -222,8 +219,12 @@ impl Game {
         }
     }
 
-    pub fn current_player(&self) -> Option<usize> {
-        self.players_remaining.get(self.player_index).copied()
+    pub fn current_player(&self) -> Result<usize, String> {
+        // self.players_remaining.get(self.player_index).copied()
+        match self.players_remaining.get(self.player_index) {
+            Some(p) => Ok(*p),
+            None => Err(format!("No player at index {}", self.player_index)),
+        }
     }
 
     /// Remove the current player from the game
@@ -250,8 +251,10 @@ impl Game {
     }
 
     pub fn get_current_anchors(&self) -> HashSet<usize> {
-        let current_player = self.current_player().expect("No current player");
-        self.board.get_anchors(current_player)
+        match self.current_player() {
+            Ok(p) => self.board.get_anchors(p),
+            Err(_) => HashSet::new(),
+        }
     }
 
     pub fn legal_tiles(&self) -> Vec<usize> {

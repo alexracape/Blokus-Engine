@@ -33,7 +33,7 @@ model = ResNet(10, 256)
 
 class TensorData(BaseModel):
     player: int
-    data: List[List[bool]]
+    data: List[List[List[bool]]]
 
 @app.post("/process_request")
 async def process_tensor(request: TensorData):
@@ -49,10 +49,11 @@ async def process_tensor(request: TensorData):
 
     # Format response
     result = {
-        "policy": policy.tolist(),
-        "values": values,
+        "policy": policy[0].tolist(),
+        "values": values[0].tolist(),
         "status": 200,
     }
+    logging.debug(f"Returning response: {result}")
     return result
 
 if __name__ == "__main__":

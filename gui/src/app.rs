@@ -77,7 +77,18 @@ async fn get_ai_move(state: &Game) -> Result<usize, String> {
                 .map(|(i, _)| i)
                 .expect("No policy found");
 
-            Ok(tile)
+            // Return tile to right perspective
+            let row = tile / D;
+            let col = tile % D;
+            let (new_row, new_col) = match state.current_player().unwrap() {
+                0 => (row, col),
+                1 => (col, D - row - 1),
+                2 => (D - row - 1, D - col - 1),
+                3 => (D - col - 1, row),
+                _ => panic!("Invalid player number"),
+            };
+
+            Ok(new_row * D + new_col)
         }
         Err(e) => Err(format!("Failed to get AI move: {:?}", e)),
     }
@@ -87,14 +98,23 @@ async fn get_ai_move(state: &Game) -> Result<usize, String> {
 async fn handle_ai_moves(state: Game) -> Game {
     let mut next_state = state.clone();
     let mut current_ai = next_state.current_player().unwrap();
-    while current_ai != 0 {
+    while current_ai != 0 { // THIS IS THE CONDITION, DOESN'T WORK WHEN HUMAN IS ELIMINATED
         let tile = get_ai_move(&next_state).await.unwrap();
         if let Err(e) = next_state.apply(tile, None) {
-            console::error!("Failed to apply AI move: {:?}", e);
+            console::error!("Failed to apply AI move:m", e);
             break;
         }
         console::log!("AI placed piece at: {:?}", tile);
-        current_ai = next_state.current_player().unwrap();
+
+        // current_ai = next_state.current_player().unwrap();
+        current_ai = match next_state.current_player() {
+            Ok(p) => p,
+            Err(e) => {
+                console::error!("Failed to get current player: ", e);
+                break;
+            }
+        };
+        console::log!("Current player: ", current_ai);
     }
 
     next_state

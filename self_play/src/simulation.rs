@@ -21,36 +21,19 @@ pub struct Config {
     exploration_fraction: f32,
 }
 
-trait StateRepr {
-    fn get_representation(&self) -> [[f32; BOARD_SIZE]; 5];
-}
 
-impl StateRepr for Game {
-    /// Get a representation of the state for the neural network
-    /// This representation includes the board and the legal tiles
-    /// Oriented to the current player
-    fn get_representation(&self) -> [[f32; BOARD_SIZE]; 5] {
-        // Get rep for the pieces on the board
-        let current_player = self.current_player().expect("No current player");
-        let board = &self.board.board;
-        let mut board_rep = [[0.0; BOARD_SIZE]; 5];
-        for i in 0..BOARD_SIZE {
-            let player = (board[i] & 0b1111) as usize; // check if there is a player piece
-            let player_board = (4 + player - current_player) % 4; // orient to current player (0 indexed)
-            if player != 0 {
-                board_rep[player_board][i] = 1.0;
-            }
+/// Rotates the policy 90 degrees to the right
+fn rotate_policy(state: [[bool; D * D]) -> [[[bool; D]; D]; 5] {
+    let mut rotated = vec![0.0; BOARD_SIZE];
+    for i in 0..D {
+        for j in 0..D {
+            rotated[j * D + (D - 1 - i)] = state[i * D + j];
         }
-
-        // Get rep for the legal spaces
-        let legal_moves = self.legal_tiles();
-        for tile in legal_moves {
-            board_rep[4][tile] = 1.0;
-        }
-
-        board_rep
     }
+
+    new_state
 }
+
 
 /// Evaluate and Expand the Node
 fn evaluate(
@@ -66,8 +49,7 @@ fn evaluate(
     }
 
     // Get the policy and value from the neural network
-    let representation = game.get_representation();
-    let legal_moves = representation[4].to_vec();
+    let representation = game.get_board_state();
 
     // Put the request in the queue
     let request = (id, representation);
@@ -79,18 +61,21 @@ fn evaluate(
     let value: Vec<f32> = inference.get_item(1)?.extract()?;
     let current_player = game.current_player().unwrap();
 
+    // Rotate the policy so they are in order
+    for _ in 0..(current_player) {
+        policy = rotate_policy(policy);
+    }
+    value = value.rotate_right(current_player);
+    println!("Policy: {:?}", policy);
+
     // Normalize policy for node priors, filter out illegal moves
-    let exp_policy: Vec<(usize, f32)> = policy
-        .iter()
-        .enumerate()
-        .filter_map(|(i, &logit)| {
-            if legal_moves[i] == 1.0 {
-                Some((i, logit.exp()))
-            } else {
-                None
-            }
-        })
-        .collect();
+    let legal_moves = game.get_legal_tiles();
+    let mut exp_policy = vec![];
+    for tile in legal_moves {
+        if policy[tile] > 0.0 {
+            exp_policy.push((tile, policy[tile].exp()));
+        }
+    }
     let total: f32 = exp_policy.iter().map(|(_, p)| p).sum();
 
     // Expand the node with the policy
