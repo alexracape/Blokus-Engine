@@ -2,11 +2,15 @@
     --board-dimension: 20;
     --square-size: 20px;
 
-    --board-color: #D9D9D9;
+    --board-color: #d9d9d9;
     --red-player: #ff0000d2;
     --yellow-player: #f8ed0e;
     --blue-player: #1616ffd2;
     --green-player: #00f500d2;
+}
+
+body {
+    font-family: Helvetica, Arial, "Helvetica Neue", sans-serif;
 }
 
 .board {

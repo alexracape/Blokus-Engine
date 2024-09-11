@@ -594,6 +594,7 @@ version = "0.1.0"
 dependencies = [
  "blokus",
  "gloo-console 0.3.0",
+ "gloo-dialogs 0.2.0",
  "reqwasm",
  "serde",
  "serde_json",

@@ -1,4 +1,5 @@
 use gloo_console as console;
+use gloo_dialogs::alert;
 use reqwasm::http::Request;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -45,7 +46,7 @@ fn print_rep(rep: [[[bool; D]; D]; 5]) {
 
 fn get_state_rep(game: &Game) -> GameStateRequest {
     GameStateRequest {
-        player: game.current_player().unwrap(),
+        player: game.current_player(),
         data: game.get_board_state(),
     }
 }
@@ -80,7 +81,7 @@ async fn get_ai_move(state: &Game) -> Result<usize, String> {
             // Return tile to right perspective
             let row = tile / D;
             let col = tile % D;
-            let (new_row, new_col) = match state.current_player().unwrap() {
+            let (new_row, new_col) = match state.current_player() {
                 0 => (row, col),
                 1 => (col, D - row - 1),
                 2 => (D - row - 1, D - col - 1),
@@ -97,27 +98,43 @@ async fn get_ai_move(state: &Game) -> Result<usize, String> {
 /// Applies AI moves to state after player has gone
 async fn handle_ai_moves(state: Game) -> Game {
     let mut next_state = state.clone();
-    let mut current_ai = next_state.current_player().unwrap();
-    while current_ai != 0 { // THIS IS THE CONDITION, DOESN'T WORK WHEN HUMAN IS ELIMINATED
+    let mut current_ai = next_state.current_player();
+    while current_ai != 0 && !next_state.is_terminal() {
+        // THIS IS THE CONDITION, DOESN'T WORK WHEN HUMAN IS ELIMINATED
         let tile = get_ai_move(&next_state).await.unwrap();
         if let Err(e) = next_state.apply(tile, None) {
             console::error!("Failed to apply AI move:m", e);
             break;
         }
-        console::log!("AI placed piece at: {:?}", tile);
 
-        // current_ai = next_state.current_player().unwrap();
-        current_ai = match next_state.current_player() {
-            Ok(p) => p,
-            Err(e) => {
-                console::error!("Failed to get current player: ", e);
-                break;
-            }
-        };
+        current_ai = next_state.current_player();
+        console::log!("AI placed piece at: {:?}", tile);
         console::log!("Current player: ", current_ai);
     }
 
     next_state
+}
+
+fn alert_game_over(game: &Game) {
+    let scores = game.get_score();
+    let best_score = scores.iter().max().unwrap();
+    let winners = scores
+        .iter()
+        .enumerate()
+        .filter_map(|(i, s)| if s == best_score { Some(i) } else { None })
+        .collect::<Vec<_>>();
+
+    let mut message = if winners.len() == 1 {
+        format!("Player {} wins!", winners[0] + 1)
+    } else {
+        format!("Players {:?} tie!", winners.iter().map(|w| w + 1).collect::<Vec<_>>())
+    };
+
+    message.push_str("\n\nScores:\n");
+    for (i, score) in scores.iter().enumerate() {
+        message.push_str(&format!("Player {}: {}\n", i + 1, score));
+    }
+    alert(&message);
 }
 
 #[function_component]
@@ -127,6 +144,11 @@ pub fn App() -> Html {
     let on_board_drop = {
         let state = state.clone();
         Callback::from(move |(p, v, offset)| {
+            // Don't do anything if game is over
+            if state.is_terminal() {
+                return;
+            }
+
             // Place piece on board
             let new_state = match state.place_piece(p, v, offset) {
                 Ok(s) => s,
@@ -140,7 +162,7 @@ pub fn App() -> Html {
 
             // Check if game is over
             if game.is_terminal() {
-                console::log!("Game over!");
+                alert_game_over(&game);
                 return;
             }
 
@@ -148,8 +170,11 @@ pub fn App() -> Html {
             let state = state.clone();
             spawn_local({
                 async move {
-                    let new_state = handle_ai_moves(game).await;
-                    state.set(new_state);
+                    let new_state = handle_ai_moves(game.clone()).await;
+                    state.set(new_state.clone());
+                    if new_state.is_terminal() {
+                        alert_game_over(&game);
+                    }
                 }
             });
         })
@@ -160,32 +185,22 @@ pub fn App() -> Html {
         Callback::from(move |_| state.set(Game::reset()))
     };
 
-    // TODO: Would I need to call AI moves after passing here?
-    // Wouldn't game calculate for you when you are done?
-    let on_pass = {
-        let state = state.clone();
-        Callback::from(move |_| {
-            let game = (*state).clone();
-            let new_state = match game.pass() {
-                Ok(s) => s,
-                Err(e) => {
-                    console::error!("Failed to pass: {:?}", e);
-                    return;
-                }
-            };
-            state.set(new_state);
-        })
-    };
-
     html! {
         <div>
             <h1>{ "Blokus Engine" }</h1>
 
             <BlokusBoard board={state.get_board()} on_board_drop={on_board_drop} anchors={state.get_current_anchors()} />
-            <PieceTray pieces={state.get_current_player_pieces()} player_num={state.current_player().unwrap() as u8 + 1} />
+            <PieceTray pieces={state.get_current_player_pieces()} player_num={state.current_player() as u8 + 1} />
 
-            <button onclick={on_pass}>{ "Pass" }</button>
             <button onclick={on_reset}>{ "Reset Game" }</button>
+
+            <h2>{ "Players Remaining" }</h2>
+            <p>{ format!("Player 1: {}", state.is_player_active(0)) }</p>
+            <p>{ format!("Player 2: {}", state.is_player_active(1)) }</p>
+            <p>{ format!("Player 3: {}", state.is_player_active(2)) }</p>
+            <p>{ format!("Player 4: {}", state.is_player_active(3)) }</p>
+
+            <h2>{ "Controls" }</h2>
 
             <p style={"white-space: pre-line"}>{"
                 Select Piece: click\n

@@ -21,9 +21,8 @@ pub struct Config {
     exploration_fraction: f32,
 }
 
-
 /// Rotates the policy 90 degrees to the right
-fn rotate_policy(state: [[bool; D * D]) -> [[[bool; D]; D]; 5] {
+fn rotate_policy(state: Vec<f32>) -> Vec<f32> {
     let mut rotated = vec![0.0; BOARD_SIZE];
     for i in 0..D {
         for j in 0..D {
@@ -31,9 +30,8 @@ fn rotate_policy(state: [[bool; D * D]) -> [[[bool; D]; D]; 5] {
         }
     }
 
-    new_state
+    rotated.to_vec()
 }
-
 
 /// Evaluate and Expand the Node
 fn evaluate(
@@ -57,16 +55,16 @@ fn evaluate(
 
     // Wait for the result
     let inference = pipe.call_method0("recv")?;
-    let policy: Vec<f32> = inference.get_item(0)?.extract()?;
-    let value: Vec<f32> = inference.get_item(1)?.extract()?;
-    let current_player = game.current_player().unwrap();
+    let mut policy: Vec<f32> = inference.get_item(0)?.extract()?;
+    let mut value: Vec<f32> = inference.get_item(1)?.extract()?;
+    let current_player = game.current_player();
 
     // Rotate the policy so they are in order
     for _ in 0..(current_player) {
         policy = rotate_policy(policy);
     }
-    value = value.rotate_right(current_player);
-    println!("Policy: {:?}", policy);
+    value.rotate_right(current_player);
+    // println!("Policy: {:?}", policy); // TODO: Double check rotation
 
     // Normalize policy for node priors, filter out illegal moves
     let legal_moves = game.get_legal_tiles();
@@ -251,7 +249,7 @@ fn best_action(
     }
 
     // Random move for baseline
-    if game.current_player().unwrap() != 0 {
+    if game.current_player() != 0 {
         let num_actions = root.children.len();
         let index = rand::thread_rng().gen_range(0..num_actions);
         let action = root.children.keys().nth(index).unwrap();
@@ -314,7 +312,7 @@ pub fn test_game(
     let mut queue;
     while !game.is_terminal() {
         // Set queue to query for this action
-        if game.current_player().unwrap() == 0 {
+        if game.current_player() == 0 {
             queue = model_queue;
         } else {
             queue = baseline_queue;

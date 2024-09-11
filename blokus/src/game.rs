@@ -6,6 +6,7 @@ use crate::pieces::{Piece, PieceVariant};
 
 const D: usize = 20;
 const BOARD_SPACES: usize = 400;
+const NUM_PLAYERS: usize = 4;
 
 /// Get the legal moves for a piece
 fn get_piece_moves(
@@ -73,9 +74,9 @@ fn get_tile_moves(board: &Board, player: usize) -> HashMap<usize, HashSet<(usize
 }
 
 /// Rotates the tensor of boards 90 degrees to the left
-fn rotate_state(state: [[[bool; D]; D]; 5]) -> [[[bool; D]; D]; 5] {
+fn rotate_state(state: [[[bool; D]; D]; NUM_PLAYERS + 1]) -> [[[bool; D]; D]; NUM_PLAYERS + 1] {
     let mut new_state = state.clone();
-    for i in 0..5 {
+    for i in 0..NUM_PLAYERS + 1 {
         // Row
         for j in 0..D {
             for k in 0..D {
@@ -87,15 +88,14 @@ fn rotate_state(state: [[[bool; D]; D]; 5]) -> [[[bool; D]; D]; 5] {
     new_state
 }
 
-
 #[derive(Clone)]
 pub struct Game {
     pub board: Board,
-    pub history: Vec<(i32, i32)>,  // Stack of moves
-    players_remaining: Vec<usize>, // Indices of players still in the game
-    player_index: usize,           // Index of the current player in players_remaining
+    pub history: Vec<(i32, i32)>, // Stack of (player, tile)
+    eliminated: [bool; NUM_PLAYERS],
+    current_player: usize,
     legal_tiles: HashMap<usize, HashSet<(usize, usize, usize)>>, // Map tile to index of the overall move
-    last_piece_lens: [u32; 4], // Size of the last piece placed by each player
+    last_piece_lens: [u32; NUM_PLAYERS], // Size of the last piece placed by each player
 }
 
 impl Game {
@@ -106,21 +106,16 @@ impl Game {
         Game {
             board: board,
             history: Vec::new(),
-            players_remaining: vec![0, 1, 2, 3],
-            player_index: 0,
+            eliminated: [false; NUM_PLAYERS],
+            current_player: 0,
             legal_tiles: legal_tiles,
-            last_piece_lens: [0; 4],
+            last_piece_lens: [0; NUM_PLAYERS],
         }
-    }
-
-    /// TODO: Implement
-    pub fn pass(&self) -> Result<Game, String> {
-        Ok(self.clone())
     }
 
     pub fn place_piece(&self, p: usize, v: usize, o: usize) -> Result<Game, String> {
         let mut new_state = self.clone();
-        let player = self.current_player().expect("No current player");
+        let player = self.current_player;
         let piece = self.get_piece(player, p, v);
 
         // Check if move is valid
@@ -154,14 +149,13 @@ impl Game {
     // want to finish playing. This is really only used by the GUI rn
     pub fn apply(&mut self, tile: usize, piece_to_finish: Option<usize>) -> Result<(), String> {
         // Place piece on board
-        let current_player = self.current_player()?;
-        self.board.place_tile(tile, current_player);
-        self.history.push((current_player as i32, tile as i32));
+        self.board.place_tile(tile, self.current_player);
+        self.history.push((self.current_player as i32, tile as i32));
 
         // Update legal tiles
         let valid_moves = match self.legal_tiles.remove(&tile) {
             Some(moves) => moves,
-            None => return Err("Invalid move".to_string()),
+            None => return Err(format!("Invalid move - Player {}, Tile {}", self.current_player, tile)),
         };
         for (tile, move_set) in self.legal_tiles.clone() {
             self.legal_tiles.insert(
@@ -180,9 +174,12 @@ impl Game {
                 Some(p) => p,
                 None => valid_moves.iter().next().unwrap().0,
             };
-            self.last_piece_lens[current_player] =
-                self.board.get_pieces(current_player).remove(piece).points;
-            self.board.use_piece(current_player, piece);
+            self.last_piece_lens[self.current_player] = self
+                .board
+                .get_pieces(self.current_player)
+                .remove(piece)
+                .points;
+            self.board.use_piece(self.current_player, piece);
 
             // Advance to next player
             self.advance_player();
@@ -195,55 +192,38 @@ impl Game {
         &self.board.board
     }
 
-    /// Gets the next player, and advances the player index
-    pub fn next_player(&mut self) -> usize {
-        self.player_index = (self.player_index + 1) % self.players_remaining.len();
-        self.players_remaining[self.player_index]
-    }
-
     /// Cycle to the next player
     /// Eliminates any players that have no legal moves
-    /// Returns index of the current player or None if the game is terminal
-    pub fn advance_player(&mut self) -> Option<usize> {
-        loop {
-            let next = self.next_player();
-            self.legal_tiles = get_tile_moves(&self.board, next);
-            if self.legal_tiles.len() == 0 {
-                self.eliminate_player();
-                if self.is_terminal() {
-                    return None;
-                }
-            } else {
-                return Some(next);
-            }
+    /// Returns index of the current player
+    pub fn advance_player(&mut self) -> usize {
+        // Return if the game is over
+        if self.is_terminal() {
+            return self.current_player;
         }
+
+        // Cycle to the next player
+        self.current_player = (self.current_player + 1) % NUM_PLAYERS;
+        self.legal_tiles = get_tile_moves(&self.board, self.current_player);
+
+        // If the player is already out of the game, cycle to the next player
+        // If they have no legal moves, eliminate them and advance
+        if self.eliminated[self.current_player] {
+            self.advance_player();
+        } else if self.legal_tiles.len() == 0 {
+            self.eliminated[self.current_player] = true;
+            self.advance_player();
+        }
+
+        self.current_player
     }
 
-    pub fn current_player(&self) -> Result<usize, String> {
+    pub fn current_player(&self) -> usize {
         // self.players_remaining.get(self.player_index).copied()
-        match self.players_remaining.get(self.player_index) {
-            Some(p) => Ok(*p),
-            None => Err(format!("No player at index {}", self.player_index)),
-        }
-    }
-
-    /// Remove the current player from the game
-    pub fn eliminate_player(&mut self) {
-        self.players_remaining.remove(self.player_index);
-        if self.players_remaining.len() == 0 {
-            return;
-        }
-
-        self.player_index = self.player_index % self.players_remaining.len();
-        self.legal_tiles = get_tile_moves(
-            &self.board,
-            self.current_player().expect("No current player"),
-        );
+        self.current_player
     }
 
     pub fn get_current_player_pieces(&self) -> Vec<Piece> {
-        let current_player = self.current_player().expect("No current player");
-        self.board.get_pieces(current_player)
+        self.board.get_pieces(self.current_player)
     }
 
     pub fn get_piece(&self, player: usize, piece: usize, variant: usize) -> PieceVariant {
@@ -251,13 +231,10 @@ impl Game {
     }
 
     pub fn get_current_anchors(&self) -> HashSet<usize> {
-        match self.current_player() {
-            Ok(p) => self.board.get_anchors(p),
-            Err(_) => HashSet::new(),
-        }
+        self.board.get_anchors(self.current_player)
     }
 
-    pub fn legal_tiles(&self) -> Vec<usize> {
+    pub fn get_legal_tiles(&self) -> Vec<usize> {
         self.legal_tiles.keys().map(|k| *k).collect()
     }
 
@@ -289,19 +266,23 @@ impl Game {
         payoff
     }
 
+    /// Check if all players have been eliminated
     pub fn is_terminal(&self) -> bool {
-        self.players_remaining.len() == 0
+        self.eliminated.iter().all(|x| *x)
+    }
+
+    pub fn is_player_active(&self, player: usize) -> bool {
+        !self.eliminated[player]
     }
 
     pub fn get_board_state(&self) -> [[[bool; D]; D]; 5] {
-        let current_player = self.current_player().unwrap();
         let mut board_state = [[[false; D]; D]; 5];
         let board = self.board.board;
         for i in 0..BOARD_SPACES {
             let player = (board[i] & 0b1111) as usize; // check if there is a player piece
             if player != 0 {
                 // Player here is 1 indexed because 0 is empty
-                let player_board = (4 + (player - 1) - current_player) % 4; // orient to current player (0 indexed)
+                let player_board = (4 + (player - 1) - self.current_player) % 4; // orient to current player (0 indexed)
                 let row = i / D;
                 let col = i % D;
                 board_state[player_board][row][col] = true;
@@ -309,7 +290,7 @@ impl Game {
         }
 
         // Get rep for the legal spaces
-        let legal_moves = self.legal_tiles();
+        let legal_moves = self.get_legal_tiles();
         for tile in legal_moves {
             let row = tile / D;
             let col = tile % D;
@@ -317,7 +298,7 @@ impl Game {
         }
 
         // Rotate the board to the current player perspective
-        for _ in 0..current_player {
+        for _ in 0..self.current_player {
             board_state = rotate_state(board_state);
         }
 
