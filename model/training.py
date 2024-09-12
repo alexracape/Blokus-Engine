@@ -26,20 +26,6 @@ class Data:
     scores: torch.Tensor
 
 
-# def get_batch(size, queue, device):
-#     ids = []
-#     items = []
-#     for _ in range(size):
-#         try:
-#             id, input = queue.get_nowait()
-#             ids.append(id)
-#             items.append(input)
-#         except Empty as e:
-#             break
-
-#     return ids, torch.tensor(items, dtype=torch.float32).view(-1, 5, DIM, DIM).to(device)
-
-
 def empty_queue(queue, device):
     ids = []
     items = []
@@ -106,6 +92,7 @@ def save(game, buffer: ReplayBuffer,):
         state_data[i] = torch.cat((new_state[player:], new_state[:player]), dim=0)
 
         # Update the policy for this move
+        print(policy)
         for element in policy:
             action, prob = element
             policy_data[i, action] = prob
@@ -115,8 +102,9 @@ def save(game, buffer: ReplayBuffer,):
             state_data[i, 4, row, col] = 1
 
         # Rotate state and policy so perspective is the same
-        state_data[i] = torch.rot90(state_data[i], k=player, dims=(1, 2))
+        state_data[i] = torch.rot90(state_data[i], k=player, dims=(2, 1))
         policy_data[i] = torch.rot90(policy_data[i].reshape(DIM, DIM), k=player).reshape(-1)
+        print(policy_data[i])
 
     data = Data(
         states = state_data,
@@ -300,13 +288,13 @@ class TestConfig(Config):
         self.batch_size = 64
         self.training_steps = 10
         self.cpus = num_cpus
-        self.games_per_cpu = 2
+        self.games_per_cpu = 1
 
         self.custom_filters = True
         self.nn_width = 16
         self.nn_depth = 2
 
-        self.sims_per_move = 2
+        self.sims_per_move = 10
         self.sample_moves = 30
         self.c_base = 19652
         self.c_init = 1.25

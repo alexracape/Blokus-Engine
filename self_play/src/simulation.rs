@@ -64,7 +64,6 @@ fn evaluate(
         policy = rotate_policy(policy);
     }
     value.rotate_right(current_player);
-    // println!("Policy: {:?}", policy); // TODO: Double check rotation
 
     // Normalize policy for node priors, filter out illegal moves
     let legal_moves = game.get_legal_tiles();
@@ -80,12 +79,6 @@ fn evaluate(
     node.to_play = current_player;
     for (tile, prob) in exp_policy {
         node.children.insert(tile, Node::new(prob / total));
-    }
-
-    // Reorient the values so they are in order: player 0, player 1, player 2, player 3
-    let mut values = vec![0.0; 4];
-    for i in 0..4 {
-        values[(4 + i - current_player) % 4] = value[i];
     }
     Ok(value)
 }
@@ -207,7 +200,7 @@ fn mcts(
         }
 
         // Expand and evaluate the leaf node
-        let values = evaluate(&mut root, &scratch_game, inference_queue, pipe, id).unwrap();
+        let values = evaluate(node, &scratch_game, inference_queue, pipe, id).unwrap();
 
         // Backpropagate the value
         backpropagate(search_path, &mut root, values)
