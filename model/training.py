@@ -92,7 +92,7 @@ def save(game, buffer: ReplayBuffer,):
         state_data[i] = torch.cat((new_state[player:], new_state[:player]), dim=0)
 
         # Update the policy for this move
-        print(policy)
+        # print(policy)
         for element in policy:
             action, prob = element
             policy_data[i, action] = prob
@@ -104,7 +104,6 @@ def save(game, buffer: ReplayBuffer,):
         # Rotate state and policy so perspective is the same
         state_data[i] = torch.rot90(state_data[i], k=player, dims=(2, 1))
         policy_data[i] = torch.rot90(policy_data[i].reshape(DIM, DIM), k=player).reshape(-1)
-        print(policy_data[i])
 
     data = Data(
         states = state_data,

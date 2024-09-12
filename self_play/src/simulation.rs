@@ -89,7 +89,11 @@ fn evaluate(
 fn ucb_score(parent: &Node, child: &Node, config: &Config) -> f32 {
     let c_base = config.c_base;
     let c_init = config.c_init;
-    let exploration_constant = (parent.visits as f32 + c_base + 1.0 / c_base).ln() + c_init;
+    let parent_visits = parent.visits as f32;
+    let exploration_constant =
+        (((parent_visits + c_base + 1.0) / c_base).ln() + c_init)
+        * parent_visits.sqrt()
+        / (1.0 + child.visits as f32);
     let prior_score = exploration_constant * child.prior;
     let value_score = child.value();
     prior_score + value_score
@@ -135,7 +139,8 @@ fn select_child(node: &Node, config: &Config) -> usize {
     let mut best_action = 0;
     for (action, child) in &node.children {
         let score = ucb_score(node, child, config);
-        if score > best_score {
+        // println!("Action: {}, Score: {}", action, score);
+        if score >= best_score {
             best_score = score;
             best_action = *action;
         }
@@ -175,20 +180,20 @@ fn mcts(
     inference_queue: &Bound<PyAny>,
     pipe: &Bound<PyAny>,
     id: i32,
-) -> Result<usize, Box<dyn std::error::Error>> {
+) -> Result<usize, String> {
     // Initialize root for these sims, evaluate it, and add children
     let mut root = Node::new(0.0);
     match evaluate(&mut root, game, inference_queue, pipe, id) {
         Ok(_) => (),
         Err(e) => {
-            println!("Error evaluating root node: {:?}", e);
-            return Err(e);
+            return Err(format!("Error evaluating root node: {:}", e));
         }
     }
     add_exploration_noise(&mut root, config);
 
     for _ in 0..config.sims_per_move {
         // Select a leaf node
+        root.visits += 1;
         let mut node = &mut root;
         let mut scratch_game = game.clone();
         let mut search_path = Vec::new();
@@ -277,8 +282,7 @@ pub fn training_game(
         let action = match mcts(&game, &mut policies, &config, inference_queue, pipe, id) {
             Ok(a) => a,
             Err(e) => {
-                println!("Error running MCTS: {:?}", e);
-                return Err("Error running MCTS".to_string());
+                return Err(format!("Error running MCTS: {}", e));
             }
         };
 
