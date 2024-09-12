@@ -89,5 +89,6 @@ class ResNet(nn.Module):
 
         # Value head
         value = self.value_head(x)
+        value = torch.softmax(value, dim=1)
 
         return policy, value

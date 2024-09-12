@@ -1,7 +1,11 @@
 """Testing a trained model against another"""
+from multiprocessing import set_start_method
+set_start_method('spawn', force=True)
+
 
 import sys
-import torch.multiprocessing as mp
+import multiprocessing as mp
+
 import logging
 import os
 import time

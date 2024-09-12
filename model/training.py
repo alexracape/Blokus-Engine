@@ -1,5 +1,7 @@
+import multiprocessing as mp
+mp.set_start_method('spawn', force=True)
+
 import argparse
-import torch.multiprocessing as mp
 import logging
 import os
 import time
@@ -24,20 +26,6 @@ class Data:
     scores: torch.Tensor
 
 
-def get_batch(size, queue, device):
-    ids = []
-    items = []
-    for _ in range(size):
-        try:
-            id, input = queue.get_nowait()
-            ids.append(id)
-            items.append(input)
-        except Empty as e:
-            break
-
-    return ids, torch.tensor(items).view(-1, 5, DIM, DIM).to(device)
-
-
 def empty_queue(queue, device):
     ids = []
     items = []
@@ -49,7 +37,7 @@ def empty_queue(queue, device):
         except Empty as e:
             break
 
-    return ids, torch.tensor(items).view(-1, 5, DIM, DIM).to(device)
+    return ids, torch.tensor(items, dtype=torch.float32).view(-1, 5, DIM, DIM).to(device)
 
 
 def handle_inference_batch(model, device, inference_queue, pipes_to_workers):
@@ -104,6 +92,7 @@ def save(game, buffer: ReplayBuffer,):
         state_data[i] = torch.cat((new_state[player:], new_state[:player]), dim=0)
 
         # Update the policy for this move
+        # print(policy)
         for element in policy:
             action, prob = element
             policy_data[i, action] = prob
@@ -113,7 +102,7 @@ def save(game, buffer: ReplayBuffer,):
             state_data[i, 4, row, col] = 1
 
         # Rotate state and policy so perspective is the same
-        state_data[i] = torch.rot90(state_data[i], k=player, dims=(1, 2))
+        state_data[i] = torch.rot90(state_data[i], k=player, dims=(2, 1))
         policy_data[i] = torch.rot90(policy_data[i].reshape(DIM, DIM), k=player).reshape(-1)
 
     data = Data(
@@ -207,10 +196,10 @@ def main():
             pipes_to_workers.append(b)
 
         # Generate spawn asynchronous self-play processes
-        with mp.Pool(config.cpus) as pool:
+        with mp.get_context("spawn").Pool(config.cpus) as pool:
             game_data = pool.starmap_async(
                 play_training_game,
-                [(config.games_per_worker, id, config, request_queue, pipes_to_model[id]) for id in range(config.games_per_round())]
+                [(id, config, request_queue, pipes_to_model[id]) for id in range(config.games_per_round())]
             )
 
             # Start handling inference requests
@@ -222,9 +211,8 @@ def main():
             pbar.close()
 
             # Save the game data to the replay buffer
-            for worker_games in game_data.get():
-                for game in worker_games:
-                    save(game, buffer)
+            for game in game_data.get():
+                save(game, buffer)
 
         # Train the model
         for step in trange(config.training_steps, desc=f"Training round {round}", leave=False):
@@ -263,16 +251,15 @@ class Config:
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
         self.batch_size = 512
-        self.training_steps = 10000
+        self.training_steps = 1000
         self.cpus = num_cpus
-        self.games_per_cpu = 4
-        self.games_per_worker = 1
+        self.games_per_cpu = 2
 
         self.custom_filters = True
         self.nn_width = 256
         self.nn_depth = 10
 
-        self.sims_per_move = 100
+        self.sims_per_move = 50
         self.sample_moves = 30
         self.c_base = 19652
         self.c_init = 1.25
@@ -283,7 +270,7 @@ class Config:
         return self.__dict__
 
     def games_per_round(self):
-        return self.cpus * self.games_per_cpu * self.games_per_worker
+        return self.cpus * self.games_per_cpu
 
     def requests_per_round(self):
         return self.games_per_round() *  DIM**2 * (self.sims_per_move + 2)
@@ -300,14 +287,13 @@ class TestConfig(Config):
         self.batch_size = 64
         self.training_steps = 10
         self.cpus = num_cpus
-        self.games_per_cpu = 4
-        self.games_per_worker = 1
+        self.games_per_cpu = 1
 
         self.custom_filters = True
         self.nn_width = 16
         self.nn_depth = 2
 
-        self.sims_per_move = 2
+        self.sims_per_move = 10
         self.sample_moves = 30
         self.c_base = 19652
         self.c_init = 1.25
