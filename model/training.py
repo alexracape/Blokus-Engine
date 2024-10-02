@@ -223,7 +223,7 @@ def main():
         for step in trange(config.training_steps, desc=f"Training round {round}", leave=False):
             train(global_step, model, buffer, optimizer, policy_loss, value_loss, device, args.test)
             global_step += 1
-        torch.save(model.state_dict(), f"{MODEL_PATH}/model_{round}.pt")
+        torch.save(model.state_dict(), f"{MODEL_PATH}/latest_model.pt")
 
     # Clean up
     logging.info("Training complete")
