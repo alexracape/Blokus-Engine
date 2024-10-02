@@ -256,9 +256,9 @@ class Config:
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
         self.batch_size = 512
-        self.training_steps = 100
+        self.training_steps = 500
         self.cpus = num_cpus
-        self.games_per_cpu = 1
+        self.games_per_cpu = 4
 
         self.custom_filters = True
         self.nn_width = 256
