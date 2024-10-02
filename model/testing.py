@@ -29,7 +29,7 @@ def main():
     Usage: python testing.py <num_games> <model1_path> <model2_path>
     """
 
-    # Parse args for number of CPUs and testing mode
+    # Parse args for number of games
     test_games = int(sys.argv[1])
     logging.info(f"Testing with {test_games} games")
     config = TestConfig(num_cpus=8)

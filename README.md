@@ -58,6 +58,11 @@ To run a job on the HPC using 32 CPU cores, 240GB of memory, and an RTX2080 card
 
 `sbatch -p mixed -N 1 -n 32 --mem=240G --gres=gpu:rtx2080:1 train.sh`
 
+### Testing
+
+To test the model, you can run the following command:
+
+`python model/testing.py [num_games] [model_path] [benchmark_model_path]`
 
 ## References
 

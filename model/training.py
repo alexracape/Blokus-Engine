@@ -80,19 +80,15 @@ def save(game, buffer: ReplayBuffer,):
     value_data = torch.tensor(values, dtype=torch.float32).repeat(num_moves, 1)
 
     # For each move from this game, update the state and policy
+    # new_state holds running game state
     new_state = torch.zeros(5, DIM, DIM, dtype=torch.float32)
     for i, (move, policy) in enumerate(zip(history, policies)):
 
-        # Keep running track of state in new_state
-        player, tile = move
-        row, col = tile // DIM, tile % DIM
-        new_state[player, row, col] = 1
-
         # Shift the state to the correct player's perspective
-        state_data[i] = torch.cat((new_state[player:], new_state[:player]), dim=0)
+        player, tile = move
+        state_data[i] = torch.cat((new_state[player:4], new_state[:player], new_state[4].unsqueeze(0)), dim=0)
 
         # Update the policy for this move
-        # print(policy)
         for element in policy:
             action, prob = element
             policy_data[i, action] = prob
@@ -102,8 +98,17 @@ def save(game, buffer: ReplayBuffer,):
             state_data[i, 4, row, col] = 1
 
         # Rotate state and policy so perspective is the same
-        state_data[i] = torch.rot90(state_data[i], k=player, dims=(2, 1))
+        state_data[i] = torch.rot90(state_data[i], k=player, dims=(1, 2))
         policy_data[i] = torch.rot90(policy_data[i].reshape(DIM, DIM), k=player).reshape(-1)
+
+        # Make the move that was made
+        row, col = tile // DIM, tile % DIM
+        new_state[player, row, col] = 1
+
+        # if  i < 20:
+        #     print(f"Player {player}")
+        #     print(f"State: {state_data[i]}")
+        #     print(f"Policy: {policy_data[i]}")
 
     data = Data(
         states = state_data,
@@ -246,14 +251,14 @@ class Config:
     """
 
     def __init__(self, num_cpus):
-        self.training_rounds = 10
+        self.training_rounds = 20
 
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
         self.batch_size = 512
-        self.training_steps = 1000
+        self.training_steps = 100
         self.cpus = num_cpus
-        self.games_per_cpu = 2
+        self.games_per_cpu = 1
 
         self.custom_filters = True
         self.nn_width = 256

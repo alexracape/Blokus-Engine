@@ -93,7 +93,7 @@ pub struct Game {
     pub board: Board,
     pub history: Vec<(i32, i32)>, // Stack of (player, tile)
     eliminated: [bool; NUM_PLAYERS],
-    current_player: usize,
+    current_player: usize, // Zero indexed!
     legal_tiles: HashMap<usize, HashSet<(usize, usize, usize)>>, // Map tile to index of the overall move
     last_piece_lens: [u32; NUM_PLAYERS], // Size of the last piece placed by each player
 }
@@ -155,7 +155,12 @@ impl Game {
         // Update legal tiles
         let valid_moves = match self.legal_tiles.remove(&tile) {
             Some(moves) => moves,
-            None => return Err(format!("Invalid move - Player {}, Tile {}", self.current_player, tile)),
+            None => {
+                return Err(format!(
+                    "Invalid move - Player {}, Tile {}",
+                    self.current_player, tile
+                ))
+            }
         };
         for (tile, move_set) in self.legal_tiles.clone() {
             self.legal_tiles.insert(

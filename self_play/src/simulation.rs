@@ -47,9 +47,7 @@ fn evaluate(
     }
 
     // Get the policy and value from the neural network
-    let representation = game.get_board_state();
-
-    // Put the request in the queue
+    let representation = game.get_board_state(); // Tested
     let request = (id, representation);
     inference_queue.call_method1("put", (request,))?;
 
@@ -74,6 +72,7 @@ fn evaluate(
         }
     }
     let total: f32 = exp_policy.iter().map(|(_, p)| p).sum();
+    // println!("Policy: {:?}\nExp: {:?}", policy, exp_policy);
 
     // Expand the node with the policy
     node.to_play = current_player;
@@ -90,8 +89,7 @@ fn ucb_score(parent: &Node, child: &Node, config: &Config) -> f32 {
     let c_base = config.c_base;
     let c_init = config.c_init;
     let parent_visits = parent.visits as f32;
-    let exploration_constant =
-        (((parent_visits + c_base + 1.0) / c_base).ln() + c_init)
+    let exploration_constant = (((parent_visits + c_base + 1.0) / c_base).ln() + c_init)
         * parent_visits.sqrt()
         / (1.0 + child.visits as f32);
     let prior_score = exploration_constant * child.prior;
@@ -291,6 +289,7 @@ pub fn training_game(
     }
 
     // Send data to train the model
+    // println!("History: {:?}", game.history);
     let values = game.get_payoff();
     let game_data = (game.history, policies, values.clone());
     Ok(game_data)
