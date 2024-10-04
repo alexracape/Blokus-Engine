@@ -292,7 +292,7 @@ class TestConfig(Config):
         self.batch_size = 64
         self.training_steps = 10
         self.cpus = num_cpus
-        self.games_per_cpu = 1
+        self.games_per_cpu = 4
 
         self.custom_filters = True
         self.nn_width = 16

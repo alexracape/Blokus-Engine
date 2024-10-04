@@ -46,7 +46,7 @@ def main():
     model.eval()
 
     second_model_path = sys.argv[3]
-    baseline = ResNet(10, 256)
+    baseline = ResNet(2, 16)
     baseline.load_state_dict(torch.load(second_model_path, weights_only=True, map_location=device))
     baseline.to(device)
     baseline.eval()
