@@ -2,6 +2,9 @@
 
 ![blokus_ai](https://github.com/user-attachments/assets/b0e97f83-328a-4218-b4cf-80c7819ab331)
 
+Checkout the hosted GUI [here](https://alexracape.github.io/blokus-engine/)
+
+
 ## Project Outline
 
 This repository contains several main sections. Most of the code is train a neural network using self-play and
