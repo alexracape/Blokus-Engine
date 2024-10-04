@@ -127,7 +127,10 @@ fn alert_game_over(game: &Game) {
     let mut message = if winners.len() == 1 {
         format!("Player {} wins!", winners[0] + 1)
     } else {
-        format!("Players {:?} tie!", winners.iter().map(|w| w + 1).collect::<Vec<_>>())
+        format!(
+            "Players {:?} tie!",
+            winners.iter().map(|w| w + 1).collect::<Vec<_>>()
+        )
     };
 
     message.push_str("\n\nScores:\n");
@@ -187,27 +190,44 @@ pub fn App() -> Html {
 
     html! {
         <div>
-            <h1>{ "Blokus Engine" }</h1>
+            <div class="title">
+                <h1>{ "Blokus Engine" }</h1>
+            </div>
 
-            <BlokusBoard board={state.get_board()} on_board_drop={on_board_drop} anchors={state.get_current_anchors()} />
+            <div class="container">
+            <div class="layout ">
+
+                <div class="side-panel">
+                    <h2>{ "Players Remaining" }</h2>
+                    <div class="player-icons">
+
+                        <div class={format!("square red {}", if !state.is_player_active(0) { "eliminated" } else { "" })}></div>
+                        <div class={format!("square blue {}", if !state.is_player_active(1) { "eliminated" } else { "" })}></div>
+                        <div class={format!("square green {}", if !state.is_player_active(2) { "eliminated" } else { "" })}></div>
+                        <div class={format!("square yellow {}", if !state.is_player_active(3) { "eliminated" } else { "" })}></div>
+                    </div>
+                </div>
+
+                <div class="main-board">
+                    <BlokusBoard board={state.get_board()} on_board_drop={on_board_drop} anchors={state.get_current_anchors()} />
+                </div>
+
+                <div class="side-panel">
+                    <h2>{ "Controls" }</h2>
+                    <p style={"white-space: pre-line"}>{"
+                        Select Piece: Click\n
+                        Place Piece: Drag\n
+                        Rotate Piece: r\n
+                        Flip Piece: f\n
+                    "}</p>
+                    <button onclick={on_reset}>{ "Reset Game" }</button>
+                </div>
+
+            </div>
+            </div>
+
             <PieceTray pieces={state.get_current_player_pieces()} player_num={state.current_player() as u8 + 1} />
 
-            <button onclick={on_reset}>{ "Reset Game" }</button>
-
-            <h2>{ "Players Remaining" }</h2>
-            <p>{ format!("Player 1: {}", state.is_player_active(0)) }</p>
-            <p>{ format!("Player 2: {}", state.is_player_active(1)) }</p>
-            <p>{ format!("Player 3: {}", state.is_player_active(2)) }</p>
-            <p>{ format!("Player 4: {}", state.is_player_active(3)) }</p>
-
-            <h2>{ "Controls" }</h2>
-
-            <p style={"white-space: pre-line"}>{"
-                Select Piece: click\n
-                Rotate Piece: r\n
-                Flip Piece: f\n
-                Place Piece: Drag onto board\n
-            "}</p>
         </div>
     }
 }

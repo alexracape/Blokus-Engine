@@ -223,7 +223,7 @@ def main():
         for step in trange(config.training_steps, desc=f"Training round {round}", leave=False):
             train(global_step, model, buffer, optimizer, policy_loss, value_loss, device, args.test)
             global_step += 1
-        torch.save(model.state_dict(), f"{MODEL_PATH}/model_{round}.pt")
+        torch.save(model.state_dict(), f"{MODEL_PATH}/latest_model.pt")
 
     # Clean up
     logging.info("Training complete")
@@ -256,9 +256,9 @@ class Config:
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
         self.batch_size = 512
-        self.training_steps = 100
+        self.training_steps = 500
         self.cpus = num_cpus
-        self.games_per_cpu = 1
+        self.games_per_cpu = 4
 
         self.custom_filters = True
         self.nn_width = 256
@@ -292,7 +292,7 @@ class TestConfig(Config):
         self.batch_size = 64
         self.training_steps = 10
         self.cpus = num_cpus
-        self.games_per_cpu = 1
+        self.games_per_cpu = 4
 
         self.custom_filters = True
         self.nn_width = 16
