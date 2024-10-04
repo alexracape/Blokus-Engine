@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Blokus GUI</title>
+        
+<script type="module" nonce="dYYTDjXEoP15XkM7I0PIVQ==">
+import init, * as bindings from '/gui-ec35f355c182d74a.js';
+const wasm = await init('/gui-ec35f355c182d74a_bg.wasm');
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+        <link rel="stylesheet" href="/style-a77ad56bf1fdaf73.css" integrity="sha384&#x2D;&#x2B;Vh&#x2B;WeXJJyY&#x2B;fe5sBWc&#x2F;YC5AKye&#x2F;kvLCc0tbmTSVyZlShe&#x2F;NBkzHm3GfrAFNxask"/>
+    
+<link rel="modulepreload" href="/gui-ec35f355c182d74a.js" crossorigin=anonymous integrity="sha384-Pqdpdclz0E7Tb/qdNXacemdG1RtlRMvJr1zb9NuKYNXXVG9fVyTde34nY2kqePg4">
+<link rel="preload" href="/gui-ec35f355c182d74a_bg.wasm" crossorigin=anonymous integrity="sha384-LdNKpQ+K//IUKbubdaTNIqkWqz+lcGHxMgYcog1vJo4BO+a5ZRegdt6LHBQBTrLU" as="fetch" type="application/wasm"></head>
+    <body></body>
+</html>
