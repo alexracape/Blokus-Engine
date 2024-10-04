@@ -181,7 +181,9 @@ jobs:
 
       - uses: actions/checkout@v2
 
-      - run: trunk build --release
+      - name: build gui
+        working-directory: ./gui
+        run: trunk build --release
 
       - uses: peaceiris/actions-gh-pages@v3
         if: github.ref == 'refs/heads/main'
