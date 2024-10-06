@@ -3,9 +3,9 @@ use std::collections::HashSet;
 use wasm_bindgen::JsCast;
 use web_sys::HtmlElement;
 
+use yew::events::DragEvent;
 use yew::prelude::*;
 use yew::{function_component, html, Properties};
-use yew::events::DragEvent;
 
 use blokus::board::BOARD_SIZE;
 
@@ -14,11 +14,19 @@ pub struct Props {
     pub board: [u8; BOARD_SIZE * BOARD_SIZE],
     pub on_board_drop: Callback<(usize, usize, usize)>,
     pub anchors: HashSet<usize>,
+    pub policy: Vec<f32>,
+    pub show_policy: bool,
 }
 
 #[function_component]
 pub fn BlokusBoard(props: &Props) -> Html {
-    let Props { board, on_board_drop, anchors } = props.clone();
+    let Props {
+        board,
+        on_board_drop,
+        anchors,
+        policy,
+        show_policy,
+    } = props.clone();
 
     let ondragover = {
         move |event: DragEvent| {
@@ -29,7 +37,7 @@ pub fn BlokusBoard(props: &Props) -> Html {
     html! {
         <div class="board">
         {for (0..BOARD_SIZE).map(|i| {
-            
+
             html! {
                 <div class="board-row">
                 {
@@ -46,6 +54,14 @@ pub fn BlokusBoard(props: &Props) -> Html {
                         if anchors.contains(&index) {
                             square_style = format!("{} anchor", square_style);
                         }
+
+                        let policy_val = policy[index];
+                        // let intensity = (policy_val * 255.0) as u8;
+                        let intensity = policy_val * 255.0;
+                        let red = 255.0 - intensity;
+                        let blue = 255.0 - intensity;
+                        let green = 255.0;
+                        let color = format!("rgb({}, {}, {})", red, green, blue);
 
                         let ondrop = {
                             on_board_drop.reform(move |e: DragEvent| {
@@ -65,7 +81,15 @@ pub fn BlokusBoard(props: &Props) -> Html {
                         };
 
                         html! {
-                            <div id={index.to_string()}  class={square_style} {ondrop} {ondragover} ></div>
+                            <div>
+                            if show_policy && policy_val > 0.0 {
+                                <div id={index.to_string()}  class={square_style} {ondrop} {ondragover}
+                                    style={format!("background-color: {};", color)}>
+                                </div>
+                            } else {
+                                <div id={index.to_string()}  class={square_style} {ondrop} {ondragover}></div>
+                            }
+                            </div>
                         }
                     })
                 }

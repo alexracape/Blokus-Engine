@@ -105,10 +105,10 @@ def save(game, buffer: ReplayBuffer,):
         row, col = tile // DIM, tile % DIM
         new_state[player, row, col] = 1
 
-        # if  i < 20:
-        #     print(f"Player {player}")
-        #     print(f"State: {state_data[i]}")
-        #     print(f"Policy: {policy_data[i]}")
+        if  i < 20:
+            print(f"Player {player}")
+            print(f"State: {state_data[i]}")
+            print(f"Policy: {policy_data[i]}")
 
     data = Data(
         states = state_data,
@@ -138,6 +138,8 @@ def train(step, model, buffer, optimizer, policy_loss, value_loss, device, testi
     optimizer.step()
 
     # Store training statistics
+    var = torch.var(policies, dim=1).mean()
+    print(f"Policy variance in batch: {var}")
     if not testing:
         wandb.log({"policy_loss": policy_loss, "value_loss": value_loss}, step=step)
 
@@ -155,9 +157,11 @@ def main():
     parser = argparse.ArgumentParser(description="Training the Blokus Deep Neural Network with Self-Play")
     parser.add_argument('--test', action='store_true', help="Run the program in testing mode")
     parser.add_argument('--cpus', type=int, default=1, help="Number of CPUs to use (default: 1)")
+    parser.add_argument('--load', type=str, help="Path to load starting model")
     args = parser.parse_args()
     logging.info(f"Using {args.cpus} CPUs")
     logging.info(f"Running in {'test' if args.test else 'full power'} mode")
+    if args.load: logging.info(f"Loading model from {args.load}")
 
     # Load environment variables
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -169,7 +173,10 @@ def main():
 
 
     # Create the model, optimizer, and loss
-    model = ResNet(config.nn_depth, config.nn_width, config.custom_filters).to(device)
+    model = ResNet(config.nn_depth, config.nn_width, config.custom_filters)
+    if args.load:
+        model.load_state_dict(torch.load(args.load, weights_only=True, map_location=device))
+    model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     policy_loss = torch.nn.CrossEntropyLoss().to(device)
     value_loss = torch.nn.MSELoss().to(device)
@@ -269,7 +276,7 @@ class Config:
         self.c_base = 19652
         self.c_init = 1.25
         self.dirichlet_alpha = 0.3
-        self.exploration_fraction = 0.25
+        self.exploration_fraction = 0.5
 
     def to_dict(self):
         return self.__dict__
@@ -303,7 +310,7 @@ class TestConfig(Config):
         self.c_base = 19652
         self.c_init = 1.25
         self.dirichlet_alpha = 0.3
-        self.exploration_fraction = 0.25
+        self.exploration_fraction = 0.5
 
 
 if __name__ == '__main__':
