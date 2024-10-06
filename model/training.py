@@ -138,9 +138,9 @@ def train(step, model, buffer, optimizer, policy_loss, value_loss, device, testi
     optimizer.step()
 
     # Store training statistics
-    var = torch.var(policies, dim=1).mean()
-    print(f"Policy variance in batch: {var}")
     if not testing:
+        # var = torch.var(policies, dim=1).mean()
+        # print(f"Policy variance in batch: {var}")
         wandb.log({"policy_loss": policy_loss, "value_loss": value_loss}, step=step)
 
 
