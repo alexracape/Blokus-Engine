@@ -177,7 +177,7 @@ def main():
     if args.load:
         model.load_state_dict(torch.load(args.load, weights_only=True, map_location=device))
     model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
     policy_loss = torch.nn.CrossEntropyLoss().to(device)
     value_loss = torch.nn.MSELoss().to(device)
 
@@ -262,6 +262,7 @@ class Config:
 
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
+        self.weight_decay = 1e-4
         self.batch_size = 512
         self.training_steps = 500
         self.cpus = num_cpus
@@ -296,6 +297,7 @@ class TestConfig(Config):
 
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
+        self.weight_decay = 1e-4
         self.batch_size = 64
         self.training_steps = 10
         self.cpus = num_cpus
