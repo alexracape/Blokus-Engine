@@ -66,7 +66,7 @@ class ResNet(nn.Module):
         )
 
 
-    def forward(self, boards):
+    def forward(self, boards, training=False):
         """Get the policy and value for the given board state
 
         For now, the board is represented by a 20x20x5 tensor where the first 4 channels are
@@ -84,7 +84,10 @@ class ResNet(nn.Module):
         policy = self.policy_head(x)
         mask = boards[:, 4, :, :].view(boards.size(0), -1)
         policy_masked = policy + (1 - mask) * -1e9
-        policy = torch.softmax(policy_masked, dim=1)
+        if training:
+            policy = policy_masked  # Cross Entropy Loss handles softmax
+        else:
+            policy = torch.softmax(policy_masked, dim=1)
 
         # Value head
         value = self.value_head(x)

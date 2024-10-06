@@ -130,7 +130,7 @@ def train(step, model, buffer, optimizer, policy_loss, value_loss, device, testi
 
     # Train the model
     optimizer.zero_grad()
-    policy, value = model(inputs)
+    policy, value = model(inputs, training=True)
     policy_loss = policy_loss(policy, policies)
     value_loss = value_loss(value, values)
     loss = policy_loss + value_loss
@@ -158,10 +158,15 @@ def main():
     parser.add_argument('--test', action='store_true', help="Run the program in testing mode")
     parser.add_argument('--cpus', type=int, default=1, help="Number of CPUs to use (default: 1)")
     parser.add_argument('--load', type=str, help="Path to load starting model")
+    parser.add_argument('--save', type=str, help="Path to save model to")
     args = parser.parse_args()
     logging.info(f"Using {args.cpus} CPUs")
     logging.info(f"Running in {'test' if args.test else 'full power'} mode")
+
+    save_path = f"{MODEL_PATH}/{args.save}" if args.save else f"{MODEL_PATH}/latest_model.pt"
     if args.load: logging.info(f"Loading model from {args.load}")
+    if args.save:
+        logging.info(f"Keeping track of model checkpoints @ {save_path}")
 
     # Load environment variables
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -177,6 +182,8 @@ def main():
     if args.load:
         model.load_state_dict(torch.load(args.load, weights_only=True, map_location=device))
     model.to(device)
+    model.train()
+
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
     policy_loss = torch.nn.CrossEntropyLoss().to(device)
     value_loss = torch.nn.MSELoss().to(device)
@@ -230,7 +237,7 @@ def main():
         for step in trange(config.training_steps, desc=f"Training round {round}", leave=False):
             train(global_step, model, buffer, optimizer, policy_loss, value_loss, device, args.test)
             global_step += 1
-        torch.save(model.state_dict(), f"{MODEL_PATH}/latest_model.pt")
+        torch.save(model.state_dict(), save_path)
 
     # Clean up
     logging.info("Training complete")
