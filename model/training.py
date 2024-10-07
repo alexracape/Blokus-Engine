@@ -105,10 +105,11 @@ def save(game, buffer: ReplayBuffer,):
         row, col = tile // DIM, tile % DIM
         new_state[player, row, col] = 1
 
-        if  i < 20:
-            print(f"Player {player}")
-            print(f"State: {state_data[i]}")
-            print(f"Policy: {policy_data[i]}")
+        # if  i < 20:
+        #     print(f"Player {player}")
+        #     print(f"State: {state_data[i]}")
+        #     print(f"Policy: {policy_data[i]}")
+    print(f"Value: {value_data}")
 
     data = Data(
         states = state_data,
@@ -284,7 +285,7 @@ class Config:
         self.c_base = 19652
         self.c_init = 1.25
         self.dirichlet_alpha = 0.3
-        self.exploration_fraction = 0.5
+        self.exploration_fraction = 0.25
 
     def to_dict(self):
         return self.__dict__
@@ -311,8 +312,8 @@ class TestConfig(Config):
         self.games_per_cpu = 4
 
         self.custom_filters = True
-        self.nn_width = 16
-        self.nn_depth = 2
+        self.nn_width = 256
+        self.nn_depth = 10
 
         self.sims_per_move = 10
         self.sample_moves = 30

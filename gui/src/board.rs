@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use gloo_console as console;
 use wasm_bindgen::JsCast;
 use web_sys::HtmlElement;
 
@@ -57,7 +58,8 @@ pub fn BlokusBoard(props: &Props) -> Html {
 
                         let policy_val = policy[index];
                         // let intensity = (policy_val * 255.0) as u8;
-                        let intensity = policy_val * 255.0;
+                        console::log!(policy_val);
+                        let intensity = 10.0 * policy_val * 255.0;
                         let red = 255.0 - intensity;
                         let blue = 255.0 - intensity;
                         let green = 255.0;

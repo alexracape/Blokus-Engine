@@ -57,6 +57,10 @@ To open the GUI in the browser run the model server and the proxy server then ru
 
 ### Training
 
+To train locally, run:
+
+`python model/training.py --test --cpus 1 --load <model_path> --save<new_path>`
+
 To run a job on the HPC using 32 CPU cores, 240GB of memory, and an RTX2080 card, you can do:
 
 `sbatch -p mixed -N 1 -n 32 --mem=240G --gres=gpu:rtx2080:1 train.sh`
