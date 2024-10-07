@@ -109,6 +109,7 @@ def save(game, buffer: ReplayBuffer,):
         #     print(f"Player {player}")
         #     print(f"State: {state_data[i]}")
         #     print(f"Policy: {policy_data[i]}")
+    print(f"Value: {value_data}")
 
     data = Data(
         states = state_data,
@@ -130,7 +131,7 @@ def train(step, model, buffer, optimizer, policy_loss, value_loss, device, testi
 
     # Train the model
     optimizer.zero_grad()
-    policy, value = model(inputs)
+    policy, value = model(inputs, training=True)
     policy_loss = policy_loss(policy, policies)
     value_loss = value_loss(value, values)
     loss = policy_loss + value_loss
@@ -139,6 +140,8 @@ def train(step, model, buffer, optimizer, policy_loss, value_loss, device, testi
 
     # Store training statistics
     if not testing:
+        # var = torch.var(policies, dim=1).mean()
+        # print(f"Policy variance in batch: {var}")
         wandb.log({"policy_loss": policy_loss, "value_loss": value_loss}, step=step)
 
 
@@ -155,9 +158,16 @@ def main():
     parser = argparse.ArgumentParser(description="Training the Blokus Deep Neural Network with Self-Play")
     parser.add_argument('--test', action='store_true', help="Run the program in testing mode")
     parser.add_argument('--cpus', type=int, default=1, help="Number of CPUs to use (default: 1)")
+    parser.add_argument('--load', type=str, help="Path to load starting model")
+    parser.add_argument('--save', type=str, help="Path to save model to")
     args = parser.parse_args()
     logging.info(f"Using {args.cpus} CPUs")
     logging.info(f"Running in {'test' if args.test else 'full power'} mode")
+
+    save_path = f"{MODEL_PATH}/{args.save}" if args.save else f"{MODEL_PATH}/latest_model.pt"
+    if args.load: logging.info(f"Loading model from {args.load}")
+    if args.save:
+        logging.info(f"Keeping track of model checkpoints @ {save_path}")
 
     # Load environment variables
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -169,8 +179,13 @@ def main():
 
 
     # Create the model, optimizer, and loss
-    model = ResNet(config.nn_depth, config.nn_width, config.custom_filters).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+    model = ResNet(config.nn_depth, config.nn_width, config.custom_filters)
+    if args.load:
+        model.load_state_dict(torch.load(args.load, weights_only=True, map_location=device))
+    model.to(device)
+    model.train()
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
     policy_loss = torch.nn.CrossEntropyLoss().to(device)
     value_loss = torch.nn.MSELoss().to(device)
 
@@ -223,7 +238,7 @@ def main():
         for step in trange(config.training_steps, desc=f"Training round {round}", leave=False):
             train(global_step, model, buffer, optimizer, policy_loss, value_loss, device, args.test)
             global_step += 1
-        torch.save(model.state_dict(), f"{MODEL_PATH}/latest_model.pt")
+        torch.save(model.state_dict(), save_path)
 
     # Clean up
     logging.info("Training complete")
@@ -255,6 +270,7 @@ class Config:
 
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
+        self.weight_decay = 1e-4
         self.batch_size = 512
         self.training_steps = 500
         self.cpus = num_cpus
@@ -289,21 +305,22 @@ class TestConfig(Config):
 
         self.buffer_capacity = 500000
         self.learning_rate = 0.01
+        self.weight_decay = 1e-4
         self.batch_size = 64
         self.training_steps = 10
         self.cpus = num_cpus
         self.games_per_cpu = 4
 
         self.custom_filters = True
-        self.nn_width = 16
-        self.nn_depth = 2
+        self.nn_width = 256
+        self.nn_depth = 10
 
         self.sims_per_move = 10
         self.sample_moves = 30
         self.c_base = 19652
         self.c_init = 1.25
         self.dirichlet_alpha = 0.3
-        self.exploration_fraction = 0.25
+        self.exploration_fraction = 0.5
 
 
 if __name__ == '__main__':
